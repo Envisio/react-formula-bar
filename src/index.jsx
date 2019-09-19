@@ -1,4 +1,5 @@
-import React, { useState, Fragment } from 'react';
+import React, { Component, Fragment } from 'react';
+import PropTypes from 'prop-types';
 import {
   isEmpty,
   first,
@@ -50,17 +51,41 @@ const suggestions = [{
   }],
 }];
 
-export default function RegularBar() {
-  const [value, setValue] = useState('');
-  const [display, toggleDisplay] = useState('none');
-  const [results, setResults] = useState(suggestions);
-  const [highlight, setHighlight] = useState([0, 0]);
-  const onChange = (event) => {
+export default class FormularBar extends Component {
+  static propTypes = {
+    value: PropTypes.string,
+    suggestions: PropTypes.arrayOf(PropTypes.shape({
+      type: PropTypes.string.isRequired,
+      color: PropTypes.string,
+      items: PropsTypes.arrayOf(PropTypes.shape({
+        title: PropTypes.string.isRequired,
+        description: PropTypes.string,
+      }))
+    }))
+  };
+
+  static defaultProps = {
+    value: '',
+    suggestions: []
+  };
+
+  constructor(props) {
+    super(props);
+    const { value } = this.props;
+    this.state = {
+      value,
+      display: 'none',
+      results: suggestions,
+      highlight: [0, 0],
+    };
+  }
+
+  onChange(event) {
     const { target: { value: inputValue } } = event;
     const matchValue = first(inputValue.match(/[A-Za-z0-9]+$/));
     if (isEmpty(matchValue)) {
-      toggleDisplay('none');
-      setHighlight([0, 0]);
+      this.setState({ display: 'none' });
+      this.setState({ highlight: [0, 0] });
     } else {
       const matchedGroups = reject(map(suggestions, ({
         items,
@@ -72,27 +97,32 @@ export default function RegularBar() {
         ...props,
       })), ({ items }) => isEmpty(items));
       if (isEmpty(matchedGroups)) {
-        toggleDisplay('none');
-        setHighlight([0, 0]);
+        this.setState({ display: 'none' });
+        this.setState({ highlight: [0, 0] });
       } else {
-        toggleDisplay('block');
+        this.setState({ display: 'block' });
       }
-      setResults(matchedGroups);
+      this.setState({ results: matchedGroups });
     }
-    setValue(inputValue);
-  };
-  const onKeyDown = (event) => {
+    this.setState({ value: inputValue });
+  }
+
+  onKeyDown(event) {
     const { key } = event;
-    const currentGroupIndex = first(highlight);
-    const currentItemIndex = last(highlight);
+    const {
+      results,
+      highlight: [currentGroupIndex, currentItemIndex],
+      display,
+      value,
+    } = this.state;
     switch (key) {
       case 'ArrowDown':
         event.preventDefault();
         if (!isEmpty(results)) {
           if (has(results, [currentGroupIndex, 'items', currentItemIndex + 1])) {
-            setHighlight([currentGroupIndex, currentItemIndex + 1]);
+            this.setState({ highlight: [currentGroupIndex, currentItemIndex + 1] });
           } else if (has(results, [currentGroupIndex + 1])) {
-            setHighlight([currentGroupIndex + 1, 0]);
+            this.setState({ highlight: [currentGroupIndex + 1, 0] });
           }
         }
         break;
@@ -100,9 +130,9 @@ export default function RegularBar() {
         event.preventDefault();
         if (!isEmpty(results)) {
           if (gt(currentItemIndex, 0)) {
-            setHighlight([currentGroupIndex, currentItemIndex - 1]);
+            this.setState({ highlight: [currentGroupIndex, currentItemIndex - 1] });
           } else if (gt(currentGroupIndex, 0)) {
-            setHighlight([currentGroupIndex - 1, size(get(results, [currentGroupIndex - 1, 'items'])) - 1]);
+            this.setState({ highlight: [currentGroupIndex - 1, size(get(results, [currentGroupIndex - 1, 'items'])) - 1] });
           }
         }
         break;
@@ -110,144 +140,152 @@ export default function RegularBar() {
         event.preventDefault();
         if (!isEmpty(first(value.match(/[A-Za-z0-9]+$/)))) {
           if (eq(display, 'block')) {
-            setValue(`${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [currentGroupIndex, 'items', currentItemIndex, 'title'])}`);
+            this.setState({ value: `${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [currentGroupIndex, 'items', currentItemIndex, 'title'])}` });
           } else {
-            setValue(value);
+            this.setState({ value });
           }
-          toggleDisplay('none');
+          this.setState({ display: 'none' });
         }
         break;
       case 'Tab':
         event.preventDefault();
         if (!isEmpty(first(value.match(/[A-Za-z0-9]+$/)))) {
           if (eq(display, 'block')) {
-            setValue(`${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [currentGroupIndex, 'items', currentItemIndex, 'title'])}`);
+            this.setState({ value: `${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [currentGroupIndex, 'items', currentItemIndex, 'title'])}` });
           } else {
-            setValue(value);
+            this.setState({ value });
           }
-          toggleDisplay('none');
+          this.setState({ display: 'none' });
         }
         break;
       case 'Backspace':
-        toggleDisplay('none');
+        this.setState({ display: 'none' });
         break;
       case 'Escape':
-        toggleDisplay('none');
+        this.setState({ display: 'none' });
         break;
       default:
         break;
     }
-  };
-  const onClick = (groupIndex, itemIndex) => {
-    setValue(`${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [groupIndex, 'items', itemIndex, 'title'])}`);
-    toggleDisplay('none');
-  };
-  const onMouseOver = (groupIndex, itemIndex) => {
-    setHighlight([groupIndex, itemIndex]);
-  };
+  }
 
-  return (
-    <div
-      style={{
-        width: '100%',
-        height: '1rem',
-        border: 'solid 1px black',
-        position: 'relative',
-        fontSize: '14px',
-        fontFamily: 'Monaco',
-      }}
-    >
-      <section
-        dangerouslySetInnerHTML={{
-          __html: (() => {
-            let formula = value;
-            each(suggestions, ({
-              color,
-              items,
-            }) => {
-              each(items, ({ title }) => {
-                formula = replace(replace(formula, new RegExp(`\\b(${title})\\b`, 'g'), `<span style="color:${color}">$1</span>`), '  ', ' &nbsp;');
-              });
-            });
-            return formula;
-          })(),
-        }}
-      />
-      <input
-        onChange={onChange}
-        value={value}
-        onKeyDown={onKeyDown}
+  onClick(groupIndex, itemIndex) {
+    const { results, value } = this.state;
+    this.setState({ value: `${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [groupIndex, 'items', itemIndex, 'title'])}` });
+    this.setState({ display: 'none' });
+  }
+
+  onMouseOver(groupIndex, itemIndex) {
+    this.setState({ highlight: [groupIndex, itemIndex] });
+  }
+
+  render() {
+    const {
+      value, highlight, results, display,
+    } = this.state;
+    return (
+      <div
         style={{
-          borderStyle: 'none',
-          outline: 'none',
           width: '100%',
-          padding: 0,
           height: '1rem',
+          border: 'solid 1px black',
+          position: 'relative',
           fontSize: '14px',
           fontFamily: 'Monaco',
-          position: 'absolute',
-          top: 0,
-          color: 'white',
-          caretColor: 'black',
-          opacity: 0.3,
-        }}
-      />
-      <dl
-        style={{
-          display,
-          top: '1rem',
-          position: 'absolute',
-          width: '100%',
-          margin: 0,
         }}
       >
-        {map(results, ({
-          type,
-          items,
-        }, groupIndex) => (
-          <Fragment
-            key={join(['suggestion', 'group', type], '-')}
-          >
-            <dt
-              style={{
-                fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
-              }}
-            >
-              {type}
-            </dt>
-            {map(items, ({
-              title,
-              description,
-            }, itemIndex) => (
-              <dd
-                key={join(['suggestion', 'group', type, 'item', title], '-')}
-                style={{
-                  marginLeft: 0,
-                }}
-                onClick={partial(onClick, groupIndex, itemIndex)}
-                onMouseOver={partial(onMouseOver, groupIndex, itemIndex)}
+        <section
+          dangerouslySetInnerHTML={{
+            __html: (() => {
+              let formula = value;
+              each(suggestions, ({
+                color,
+                items,
+              }) => {
+                each(items, ({ title }) => {
+                  formula = replace(replace(formula, new RegExp(`\\b(${title})\\b`, 'g'), `<span style="color:${color}">$1</span>`), '  ', ' &nbsp;');
+                });
+              });
+              return formula;
+            })(),
+          }}
+        />
+        <input
+          onChange={this.onChange}
+          value={value}
+          onKeyDown={this.onKeyDown}
+          style={{
+            borderStyle: 'none',
+            outline: 'none',
+            width: '100%',
+            padding: 0,
+            height: '1rem',
+            fontSize: '14px',
+            fontFamily: 'Monaco',
+            position: 'absolute',
+            top: 0,
+            color: 'white',
+            caretColor: 'black',
+            opacity: 0.3,
+          }}
+        />
+        <dl
+          style={{
+            display,
+            top: '1rem',
+            position: 'absolute',
+            width: '100%',
+            margin: 0,
+          }}
+        >
+          {map(results, ({
+            type,
+            items,
+          }, groupIndex) => (
+              <Fragment
+                key={join(['suggestion', 'group', type], '-')}
               >
-                <label
+                <dt
                   style={{
-                    fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined,
+                    fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
                   }}
                 >
-                  {title}
-                </label>
-                <i
-                  style={{
-                    paddingLeft: '1rem',
-                    margin: 0,
-                    color: 'grey',
-                  }}
-                >
-                  {description}
-                </i>
-              </dd>
+                  {type}
+                </dt>
+                {map(items, ({
+                  title,
+                  description,
+                }, itemIndex) => (
+                    <dd
+                      key={join(['suggestion', 'group', type, 'item', title], '-')}
+                      style={{
+                        marginLeft: 0,
+                      }}
+                      onClick={partial(this.onClick, groupIndex, itemIndex)}
+                      onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
+                    >
+                      <label
+                        style={{
+                          fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined,
+                        }}
+                      >
+                        {title}
+                      </label>
+                      <i
+                        style={{
+                          paddingLeft: '1rem',
+                          margin: 0,
+                          color: 'grey',
+                        }}
+                      >
+                        {description}
+                      </i>
+                    </dd>
+                  ))}
+              </Fragment>
             ))}
-          </Fragment>
-        ))}
-      </dl>
-    </div>
-  );
+        </dl>
+      </div>
+    );
+  }
 }
