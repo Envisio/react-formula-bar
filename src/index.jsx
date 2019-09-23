@@ -53,6 +53,11 @@ export default class FormularBar extends Component {
       listItemDescription: PropTypes.obj,
       listGroup: PropTypes.obj,
     }),
+    disabled: PropTypes.bool,
+    placeholder: PropTypes.string,
+    onBlur: PropTypes.func,
+    readonly: PropTypes.readonly,
+    type: PropTypes.string,
   };
 
   static defaultProps = {
@@ -128,6 +133,11 @@ export default class FormularBar extends Component {
       }),
     },
     onChange: () => { },
+    disabled: false,
+    placeholder: '',
+    onBlur: () => { },
+    readonly: false,
+    type: 'text',
   };
 
   constructor(props) {
@@ -308,6 +318,11 @@ export default class FormularBar extends Component {
       suggestions,
       classes,
       styles,
+      type,
+      disabled,
+      readonly,
+      onBlur,
+      placeholder,
     } = this.props;
     const {
       value,
@@ -346,6 +361,11 @@ export default class FormularBar extends Component {
           value={value}
           onKeyDown={this.onKeyDown}
           style={styles.input()}
+          readOnly={readonly}
+          disabled={disabled}
+          placeholder={placeholder}
+          type={type}
+          onBlur={partial(onBlur, value)}
         />
         <dl
           className={classes.listContainer}
