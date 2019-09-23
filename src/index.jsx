@@ -5,9 +5,11 @@ import {
   first,
   map,
   join,
-  lowerCase,
+  toLower,
   filter,
-  startsWith,
+  endsWith,
+  split,
+  indexOf,
   reject,
   eq,
   last,
@@ -18,38 +20,8 @@ import {
   replace,
   each,
   partial,
+  compact,
 } from 'lodash';
-
-const suggestions = [{
-  type: 'keyword',
-  color: 'red',
-  items: [{
-    title: 'SUM',
-    description: 'this is summary function',
-  }, {
-    title: 'AVG',
-    description: 'this is average function',
-  }, {
-    title: 'MIN',
-    description: 'get the tiny one',
-  }, {
-    title: 'MAX',
-    description: 'get the biggest one',
-  }],
-}, {
-  type: 'variable',
-  color: 'blue',
-  items: [{
-    title: 'SV1',
-    description: 'summary variable',
-  }, {
-    title: 'IV2',
-    description: 'indicator variable',
-  }, {
-    title: 'CV3',
-    description: 'column variable',
-  }],
-}];
 
 export default class FormularBar extends Component {
   static propTypes = {
@@ -57,21 +29,110 @@ export default class FormularBar extends Component {
     suggestions: PropTypes.arrayOf(PropTypes.shape({
       type: PropTypes.string.isRequired,
       color: PropTypes.string,
-      items: PropsTypes.arrayOf(PropTypes.shape({
+      items: PropTypes.arrayOf(PropTypes.shape({
         title: PropTypes.string.isRequired,
         description: PropTypes.string,
-      }))
-    }))
+      })),
+    })),
+    onChange: PropTypes.func,
+    classes: PropTypes.shape({
+      container: PropTypes.string,
+      value: PropTypes.string,
+      input: PropTypes.string,
+      listItem: PropTypes.string,
+      listItemLabel: PropTypes.string,
+      listItemDescription: PropTypes.string,
+      listGroup: PropTypes.string,
+    }),
+    styles: PropTypes.shape({
+      container: PropTypes.obj,
+      value: PropTypes.obj,
+      input: PropTypes.obj,
+      listItem: PropTypes.obj,
+      listItemLabel: PropTypes.obj,
+      listItemDescription: PropTypes.obj,
+      listGroup: PropTypes.obj,
+    }),
   };
 
   static defaultProps = {
     value: '',
-    suggestions: []
+    suggestions: [],
+    classes: {},
+    styles: {
+      container: () => ({
+        width: '100%',
+        height: '34px',
+        border: 'solid 1px grey',
+        position: 'relative',
+        fontSize: '14px',
+        fontFamily: 'Monaco',
+        borderRadius: '5px',
+        backgroundColor: 'white',
+      }),
+      value: () => ({
+        height: '34px',
+        lineHeight: '34px',
+        padding: '0 6px',
+      }),
+      input: () => ({
+        borderStyle: 'none',
+        outline: 'none',
+        width: '100%',
+        padding: '0 6px',
+        lineHeight: '34px',
+        height: '34px',
+        fontSize: '14px',
+        fontFamily: 'Monaco',
+        position: 'absolute',
+        top: 0,
+        color: 'transparent',
+        caretColor: 'black',
+        backgroundColor: 'transparent',
+      }),
+      listContainer: ({ display }) => ({
+        display,
+        top: '34px',
+        position: 'absolute',
+        width: '100%',
+        margin: 0,
+        backgroundColor: 'white',
+        borderRadius: '5px',
+        borderColor: 'grey',
+        borderWidth: '1px',
+      }),
+      listItem: () => ({
+        marginLeft: 0,
+        borderBottom: 'solid 1px grey',
+        padding: '0 6px',
+      }),
+      listItemLabel: ({
+        groupIndex,
+        highlight,
+        itemIndex,
+      }) => ({
+        fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined,
+      }),
+      listItemDescription: () => ({
+        paddingLeft: '14px',
+        margin: 0,
+        color: 'grey',
+      }),
+      listGroup: ({
+        groupIndex,
+        highlight,
+      }) => ({
+        fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
+        padding: '0 6px',
+        color: 'grey',
+      }),
+    },
+    onChange: () => { },
   };
 
   constructor(props) {
     super(props);
-    const { value } = this.props;
+    const { value, suggestions } = this.props;
     this.state = {
       value,
       display: 'none',
@@ -80,34 +141,67 @@ export default class FormularBar extends Component {
     };
   }
 
-  onChange(event) {
-    const { target: { value: inputValue } } = event;
-    const matchValue = first(inputValue.match(/[A-Za-z0-9]+$/));
-    if (isEmpty(matchValue)) {
+  onChange = (event) => {
+    const {
+      onChange,
+      suggestions,
+    } = this.props;
+    const {
+      target: { value },
+    } = event;
+    const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
+    let valueLast;
+
+    if (valueTail.match(/[A-Za-z\d]+$/g)) {
+      valueLast = last(valueTail.match(/[A-Za-z\d]+$/g));
+    } else {
+      valueLast = last(valueTail);
+    }
+
+    let maxMatch = 0;
+    const matchedGroups = reject(map(suggestions, ({
+      items,
+      ...props
+    }) => ({
+      items: compact(map(items, ({
+        title,
+        description,
+      }) => {
+        const indexEnd = toLower(title).indexOf(toLower(valueLast));
+        const matchValue = title.substring(0, indexEnd + size(valueLast));
+        const matchSize = size(matchValue);
+
+        if (gt(matchSize, 0) && endsWith(toLower(valueTail), toLower(matchValue)) && matchSize < size(title)) {
+          maxMatch = matchSize > maxMatch ? matchSize : maxMatch;
+
+          if (matchSize >= maxMatch) {
+            return {
+              title,
+              matchSize,
+              description,
+            };
+          }
+
+          return undefined;
+        }
+
+        return undefined;
+      })),
+      ...props,
+    })), ({ items }) => isEmpty(filter(items, ({ matchSize }) => eq(matchSize, maxMatch))));
+
+    if (isEmpty(matchedGroups)) {
       this.setState({ display: 'none' });
       this.setState({ highlight: [0, 0] });
     } else {
-      const matchedGroups = reject(map(suggestions, ({
-        items,
-        ...props
-      }) => ({
-        items: filter(items, ({
-          title,
-        }) => startsWith(lowerCase(title), lowerCase(matchValue) || matchValue)),
-        ...props,
-      })), ({ items }) => isEmpty(items));
-      if (isEmpty(matchedGroups)) {
-        this.setState({ display: 'none' });
-        this.setState({ highlight: [0, 0] });
-      } else {
-        this.setState({ display: 'block' });
-      }
-      this.setState({ results: matchedGroups });
+      this.setState({ display: 'block' });
     }
-    this.setState({ value: inputValue });
+
+    this.setState({ results: matchedGroups });
+    this.setState({ value }, () => onChange(value));
   }
 
-  onKeyDown(event) {
+  onKeyDown = (event) => {
     const { key } = event;
     const {
       results,
@@ -115,9 +209,11 @@ export default class FormularBar extends Component {
       display,
       value,
     } = this.state;
+
     switch (key) {
       case 'ArrowDown':
         event.preventDefault();
+
         if (!isEmpty(results)) {
           if (has(results, [currentGroupIndex, 'items', currentItemIndex + 1])) {
             this.setState({ highlight: [currentGroupIndex, currentItemIndex + 1] });
@@ -128,6 +224,7 @@ export default class FormularBar extends Component {
         break;
       case 'ArrowUp':
         event.preventDefault();
+
         if (!isEmpty(results)) {
           if (gt(currentItemIndex, 0)) {
             this.setState({ highlight: [currentGroupIndex, currentItemIndex - 1] });
@@ -138,25 +235,41 @@ export default class FormularBar extends Component {
         break;
       case 'Enter':
         event.preventDefault();
-        if (!isEmpty(first(value.match(/[A-Za-z0-9]+$/)))) {
-          if (eq(display, 'block')) {
-            this.setState({ value: `${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [currentGroupIndex, 'items', currentItemIndex, 'title'])}` });
-          } else {
-            this.setState({ value });
-          }
-          this.setState({ display: 'none' });
+
+        if (eq(display, 'block')) {
+          const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
+          const valueLast = last(valueTail);
+          const currentTitle = get(results, [currentGroupIndex, 'items', currentItemIndex, 'title']);
+          const indexEnd = indexOf(split(toLower(currentTitle), ''), toLower(valueLast));
+          const matchValue = currentTitle.substring(0, indexEnd + 1);
+          const matchSize = size(matchValue);
+          const valueSize = size(value);
+          const startIndex = valueSize - matchSize;
+          this.setState({ value: `${value.substring(0, startIndex)}${currentTitle}` });
+        } else {
+          this.setState({ value });
         }
+
+        this.setState({ display: 'none' });
         break;
       case 'Tab':
         event.preventDefault();
-        if (!isEmpty(first(value.match(/[A-Za-z0-9]+$/)))) {
-          if (eq(display, 'block')) {
-            this.setState({ value: `${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [currentGroupIndex, 'items', currentItemIndex, 'title'])}` });
-          } else {
-            this.setState({ value });
-          }
-          this.setState({ display: 'none' });
+
+        if (eq(display, 'block')) {
+          const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
+          const valueLast = last(valueTail);
+          const currentTitle = get(results, [currentGroupIndex, 'items', currentItemIndex, 'title']);
+          const indexEnd = indexOf(split(toLower(currentTitle), ''), toLower(valueLast));
+          const matchValue = currentTitle.substring(0, indexEnd + 1);
+          const matchSize = size(matchValue);
+          const valueSize = size(value);
+          const startIndex = valueSize - matchSize;
+          this.setState({ value: `${value.substring(0, startIndex)}${currentTitle}` });
+        } else {
+          this.setState({ value });
         }
+
+        this.setState({ display: 'none' });
         break;
       case 'Backspace':
         this.setState({ display: 'none' });
@@ -169,32 +282,48 @@ export default class FormularBar extends Component {
     }
   }
 
-  onClick(groupIndex, itemIndex) {
-    const { results, value } = this.state;
-    this.setState({ value: `${replace(value, /[A-Za-z0-9]+$/, '')}${get(results, [groupIndex, 'items', itemIndex, 'title'])}` });
+  onClick = (groupIndex, itemIndex) => {
+    const {
+      results,
+      value,
+    } = this.state;
+    const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
+    const valueLast = last(valueTail);
+    const currentTitle = get(results, [groupIndex, 'items', itemIndex, 'title']);
+    const indexEnd = indexOf(split(toLower(currentTitle), ''), toLower(valueLast));
+    const matchValue = currentTitle.substring(0, indexEnd + 1);
+    const matchSize = size(matchValue);
+    const valueSize = size(value);
+    const startIndex = valueSize - matchSize;
+    this.setState({ value: `${value.substring(0, startIndex)}${currentTitle}` });
     this.setState({ display: 'none' });
   }
 
-  onMouseOver(groupIndex, itemIndex) {
+  onMouseOver = (groupIndex, itemIndex) => {
     this.setState({ highlight: [groupIndex, itemIndex] });
   }
 
   render() {
     const {
-      value, highlight, results, display,
+      suggestions,
+      classes,
+      styles,
+    } = this.props;
+    const {
+      value,
+      highlight,
+      results,
+      display,
     } = this.state;
+
     return (
       <div
-        style={{
-          width: '100%',
-          height: '1rem',
-          border: 'solid 1px black',
-          position: 'relative',
-          fontSize: '14px',
-          fontFamily: 'Monaco',
-        }}
+        className={classes.container}
+        style={styles.container()}
       >
         <section
+          className={classes.value}
+          style={styles.value()}
           dangerouslySetInnerHTML={{
             __html: (() => {
               let formula = value;
@@ -203,87 +332,71 @@ export default class FormularBar extends Component {
                 items,
               }) => {
                 each(items, ({ title }) => {
-                  formula = replace(replace(formula, new RegExp(`\\b(${title})\\b`, 'g'), `<span style="color:${color}">$1</span>`), '  ', ' &nbsp;');
+                  formula = replace(replace(formula, new RegExp(`(${replace(title, /[|\\{}()[\]^$+*?.-]/g, '\\$&')})`, 'g'), `<span style="color:${color}">$1</span>`), '  ', ' &nbsp;');
                 });
               });
+
               return formula;
             })(),
           }}
         />
         <input
+          className={classes.input}
           onChange={this.onChange}
           value={value}
           onKeyDown={this.onKeyDown}
-          style={{
-            borderStyle: 'none',
-            outline: 'none',
-            width: '100%',
-            padding: 0,
-            height: '1rem',
-            fontSize: '14px',
-            fontFamily: 'Monaco',
-            position: 'absolute',
-            top: 0,
-            color: 'white',
-            caretColor: 'black',
-            opacity: 0.3,
-          }}
+          style={styles.input()}
         />
         <dl
-          style={{
-            display,
-            top: '1rem',
-            position: 'absolute',
-            width: '100%',
-            margin: 0,
-          }}
+          className={classes.listContainer}
+          style={styles.listContainer({ display })}
         >
           {map(results, ({
             type,
             items,
           }, groupIndex) => (
-              <Fragment
-                key={join(['suggestion', 'group', type], '-')}
+            <Fragment key={join(['suggestion', 'group', type], '-')}>
+              <dt
+                className={classes.listGroup}
+                style={styles.listGroup({
+                  groupIndex,
+                  highlight,
+                })}
               >
-                <dt
-                  style={{
-                    fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
-                  }}
+                {type}
+              </dt>
+              {map(items, ({
+                title,
+                description,
+              }, itemIndex) => (
+                <dd
+                  className={classes.listItem}
+                  key={join(['suggestion', 'group', type, 'item', title], '-')}
+                  style={styles.listItem()}
+                  onClick={partial(this.onClick, groupIndex, itemIndex)}
+                  onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
+                  onFocus={partial(this.onMouseOver, groupIndex, itemIndex)}
                 >
-                  {type}
-                </dt>
-                {map(items, ({
-                  title,
-                  description,
-                }, itemIndex) => (
-                    <dd
-                      key={join(['suggestion', 'group', type, 'item', title], '-')}
-                      style={{
-                        marginLeft: 0,
-                      }}
-                      onClick={partial(this.onClick, groupIndex, itemIndex)}
-                      onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
-                    >
-                      <label
-                        style={{
-                          fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined,
-                        }}
-                      >
-                        {title}
-                      </label>
-                      <i
-                        style={{
-                          paddingLeft: '1rem',
-                          margin: 0,
-                          color: 'grey',
-                        }}
-                      >
-                        {description}
-                      </i>
-                    </dd>
-                  ))}
-              </Fragment>
-            ))}
+                  <label
+                    className={classes.listItemLabel}
+                    style={styles.listItemLabel({
+                      groupIndex,
+                      itemIndex,
+                      highlight,
+                    })}
+                  >
+                    {title}
+                  </label>
+                  <i
+                    className={classes.listItemDescription}
+                    style={styles.listItemDescription()}
+                  >
+                    {description}
+                  </i>
+                </dd>
+              ))}
+            </Fragment>
+          ))}
         </dl>
       </div>
     );
