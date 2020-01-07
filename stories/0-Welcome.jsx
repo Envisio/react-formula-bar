@@ -1,12 +1,12 @@
 import React from 'react';
-import FormularBar from '../src/index';
+import FormulaBar from '../src/index';
 
 export default {
-  title: 'Formular Bar',
+  title: 'Formula Bar',
 };
 
 export const suggestion = () => (
-  <FormularBar
+  <FormulaBar
     placeholder="Try type one of these function name(SUM/AVG/COUNT)."
     suggestions={[{
       type: '',
@@ -30,7 +30,7 @@ suggestion.story = {
 };
 
 export const highlight = () => (
-  <FormularBar
+  <FormulaBar
     placeholder="Try type one of these function name(SUM/AVG/COUNT)."
     suggestions={[{
       type: '',
@@ -54,7 +54,7 @@ highlight.story = {
 };
 
 export const description = () => (
-  <FormularBar
+  <FormulaBar
     placeholder="Try type one of these function name(SUM/AVG/COUNT)."
     suggestions={[{
       type: '',
@@ -78,7 +78,7 @@ description.story = {
 };
 
 export const group = () => (
-  <FormularBar
+  <FormulaBar
     placeholder="Try type one of these function name(SUM/AVG/COUNT) or any variable type(Number/String/Boolean)."
     suggestions={[{
       type: 'Function',
@@ -115,7 +115,7 @@ group.story = {
 };
 
 export const style = () => (
-  <FormularBar
+  <FormulaBar
     placeholder="Try type one of these function name(SUM/AVG/COUNT)."
     suggestions={[{
       type: '',

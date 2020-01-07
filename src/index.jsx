@@ -23,7 +23,7 @@ import {
   compact,
 } from 'lodash';
 
-export default class FormularBar extends Component {
+export default class FormulaBar extends Component {
   static propTypes = {
     value: PropTypes.string,
     suggestions: PropTypes.arrayOf(PropTypes.shape({
