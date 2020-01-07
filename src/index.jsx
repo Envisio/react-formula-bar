@@ -45,18 +45,18 @@ export default class FormularBar extends Component {
       listGroup: PropTypes.string,
     }),
     styles: PropTypes.shape({
-      container: PropTypes.obj,
-      value: PropTypes.obj,
-      input: PropTypes.obj,
-      listItem: PropTypes.obj,
-      listItemLabel: PropTypes.obj,
-      listItemDescription: PropTypes.obj,
-      listGroup: PropTypes.obj,
+      container: PropTypes.func,
+      value: PropTypes.func,
+      input: PropTypes.func,
+      listItem: PropTypes.func,
+      listItemLabel: PropTypes.func,
+      listItemDescription: PropTypes.func,
+      listGroup: PropTypes.func,
     }),
     disabled: PropTypes.bool,
     placeholder: PropTypes.string,
     onBlur: PropTypes.func,
-    readonly: PropTypes.readonly,
+    readonly: PropTypes.bool,
     type: PropTypes.string,
   };
 
@@ -65,72 +65,14 @@ export default class FormularBar extends Component {
     suggestions: [],
     classes: {},
     styles: {
-      container: () => ({
-        width: '100%',
-        height: '34px',
-        border: 'solid 1px grey',
-        position: 'relative',
-        fontSize: '14px',
-        fontFamily: 'Monaco',
-        borderRadius: '5px',
-        backgroundColor: 'white',
-      }),
-      value: () => ({
-        height: '34px',
-        lineHeight: '34px',
-        padding: '0 6px',
-      }),
-      input: () => ({
-        borderStyle: 'none',
-        outline: 'none',
-        width: '100%',
-        padding: '0 6px',
-        lineHeight: '34px',
-        height: '34px',
-        fontSize: '14px',
-        fontFamily: 'Monaco',
-        position: 'absolute',
-        top: 0,
-        color: 'transparent',
-        caretColor: 'black',
-        backgroundColor: 'transparent',
-      }),
-      listContainer: ({ display }) => ({
-        display,
-        top: '34px',
-        position: 'absolute',
-        width: '100%',
-        margin: 0,
-        backgroundColor: 'white',
-        borderRadius: '5px',
-        borderColor: 'grey',
-        borderWidth: '1px',
-      }),
-      listItem: () => ({
-        marginLeft: 0,
-        borderBottom: 'solid 1px grey',
-        padding: '0 6px',
-      }),
-      listItemLabel: ({
-        groupIndex,
-        highlight,
-        itemIndex,
-      }) => ({
-        fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined,
-      }),
-      listItemDescription: () => ({
-        paddingLeft: '14px',
-        margin: 0,
-        color: 'grey',
-      }),
-      listGroup: ({
-        groupIndex,
-        highlight,
-      }) => ({
-        fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
-        padding: '0 6px',
-        color: 'grey',
-      }),
+      container: styles => styles,
+      value: styles => styles,
+      input: styles => styles,
+      listContainer: styles => styles,
+      listItem: styles => styles,
+      listItemLabel: styles => styles,
+      listItemDescription: styles => styles,
+      listGroup: styles => styles,
     },
     onChange: () => { },
     disabled: false,
@@ -325,6 +267,16 @@ export default class FormularBar extends Component {
       placeholder,
     } = this.props;
     const {
+      container: containerStyle = styles => styles,
+      value: valueStyle = styles => styles,
+      input: inputStyle = styles => styles,
+      listContainer: listContainerStyle = styles => styles,
+      listItem: listItemStyle = styles => styles,
+      listItemLabel: listItemLabelStyle = styles => styles,
+      listItemDescription: listItemDescriptionStyle = styles => styles,
+      listGroup: listGroupStyle = styles => styles,
+    } = styles;
+    const {
       value,
       highlight,
       results,
@@ -334,11 +286,24 @@ export default class FormularBar extends Component {
     return (
       <div
         className={classes.container}
-        style={styles.container()}
+        style={containerStyle({
+          width: '100%',
+          height: '34px',
+          border: 'solid 1px gray',
+          position: 'relative',
+          fontSize: '14px',
+          fontFamily: 'Monaco, Courier, "Ubuntu Mono", monospace',
+          borderRadius: '5px',
+          backgroundColor: 'white',
+        })}
       >
         <section
           className={classes.value}
-          style={styles.value()}
+          style={valueStyle({
+            height: '34px',
+            lineHeight: '34px',
+            padding: '0 6px',
+          })}
           dangerouslySetInnerHTML={{
             __html: (() => {
               let formula = value;
@@ -360,7 +325,22 @@ export default class FormularBar extends Component {
           onChange={this.onChange}
           value={value}
           onKeyDown={this.onKeyDown}
-          style={styles.input()}
+          style={inputStyle({
+            borderStyle: 'none',
+            outline: 'none',
+            width: '100%',
+            padding: '0 6px',
+            lineHeight: '34px',
+            height: '34px',
+            fontSize: '14px',
+            fontFamily: 'Monaco, Courier',
+            position: 'absolute',
+            top: 0,
+            color: 'transparent',
+            caretColor: 'black',
+            backgroundColor: 'transparent',
+            overflow: 'hidden'
+          })}
           readOnly={readonly}
           disabled={disabled}
           placeholder={placeholder}
@@ -369,54 +349,84 @@ export default class FormularBar extends Component {
         />
         <dl
           className={classes.listContainer}
-          style={styles.listContainer({ display })}
+          style={listContainerStyle({
+            display,
+            top: '38px',
+            left: '-1px',
+            position: 'absolute',
+            width: '100%',
+            margin: 0,
+            backgroundColor: 'white',
+            borderRadius: '5px',
+            borderColor: 'dimgray',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            overflow: 'hidden',
+          })}
         >
           {map(results, ({
             type,
             items,
           }, groupIndex) => (
-            <Fragment key={join(['suggestion', 'group', type], '-')}>
-              <dt
-                className={classes.listGroup}
-                style={styles.listGroup({
-                  groupIndex,
-                  highlight,
-                })}
-              >
-                {type}
-              </dt>
-              {map(items, ({
-                title,
-                description,
-              }, itemIndex) => (
-                <dd
-                  className={classes.listItem}
-                  key={join(['suggestion', 'group', type, 'item', title], '-')}
-                  style={styles.listItem()}
-                  onClick={partial(this.onClick, groupIndex, itemIndex)}
-                  onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
-                  onFocus={partial(this.onMouseOver, groupIndex, itemIndex)}
+              <Fragment key={join(['suggestion', 'group', type], '-')}>
+                <dt
+                  className={classes.listGroup}
+                  style={listGroupStyle({
+                    fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
+                    padding: '0 6px',
+                    color: 'gray',
+                  })}
                 >
-                  <label
-                    className={classes.listItemLabel}
-                    style={styles.listItemLabel({
-                      groupIndex,
-                      itemIndex,
-                      highlight,
-                    })}
-                  >
-                    {title}
-                  </label>
-                  <i
-                    className={classes.listItemDescription}
-                    style={styles.listItemDescription()}
-                  >
-                    {description}
-                  </i>
-                </dd>
-              ))}
-            </Fragment>
-          ))}
+                  {type}
+                </dt>
+                {map(items, ({
+                  title,
+                  description,
+                }, itemIndex) => (
+                    <dd
+                      className={classes.listItem}
+                      key={join(['suggestion', 'group', type, 'item', title], '-')}
+                      style={listItemStyle({
+                        marginLeft: 0,
+                        padding: '0 6px',
+                        lineHeight: '28px',
+                        backgroundColor: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'gainsboro' : 'white',
+                        cursor: 'pointer',
+                      }, {
+                        groupIndex,
+                        itemIndex,
+                        highlight,
+                        suggestions,
+                      })}
+                      onClick={partial(this.onClick, groupIndex, itemIndex)}
+                      onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
+                      onFocus={partial(this.onMouseOver, groupIndex, itemIndex)}
+                    >
+                      <label
+                        className={classes.listItemLabel}
+                        style={listItemLabelStyle({ fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined }, {
+                          groupIndex,
+                          itemIndex,
+                          highlight,
+                          suggestions,
+                        })}
+                      >
+                        {title}
+                      </label>
+                      <i
+                        className={classes.listItemDescription}
+                        style={listItemDescriptionStyle({
+                          paddingLeft: '14px',
+                          margin: 0,
+                          color: 'gray',
+                        })}
+                      >
+                        {description}
+                      </i>
+                    </dd>
+                  ))}
+              </Fragment>
+            ))}
         </dl>
       </div>
     );
