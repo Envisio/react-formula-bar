@@ -1,39 +1,38 @@
 {
   "name": "react-formula-bar",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "dependencies": {
     "lodash": "^4.17.15",
     "prop-types": "^15.7.2",
-    "react": "^16.12.0",
-    "react-dom": "^16.12.0"
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1"
   },
   "main": "./lib/index.js",
   "scripts": {
-    "build": "./node_modules/.bin/babel src -d lib",
-    "storybook": "start-storybook -p 6006",
-    "build-storybook": "build-storybook -c .storybook -o ./docs"
+    "build": "./node_modules/.bin/babel src -d lib && build-storybook -c .storybook -o ./docs",
+    "start": "start-storybook -p 6006"
   },
   "license": "MIT",
   "devDependencies": {
-    "@babel/cli": "^7.7.7",
-    "@babel/core": "^7.7.7",
-    "@babel/plugin-proposal-class-properties": "^7.7.4",
-    "@babel/plugin-syntax-jsx": "^7.7.4",
-    "@babel/preset-env": "^7.7.7",
-    "@babel/preset-react": "^7.7.4",
-    "@storybook/addon-actions": "^5.2.8",
-    "@storybook/addon-links": "^5.2.8",
-    "@storybook/addons": "^5.2.8",
-    "@storybook/react": "^5.2.8",
-    "babel-loader": "^8.0.6",
+    "@babel/cli": "^7.8.4",
+    "@babel/core": "^7.9.0",
+    "@babel/plugin-proposal-class-properties": "^7.8.3",
+    "@babel/plugin-syntax-jsx": "^7.8.3",
+    "@babel/preset-env": "^7.9.5",
+    "@babel/preset-react": "^7.9.4",
+    "@storybook/addon-actions": "^5.3.18",
+    "@storybook/addon-links": "^5.3.18",
+    "@storybook/addons": "^5.3.18",
+    "@storybook/react": "^5.3.18",
+    "babel-loader": "^8.1.0",
     "eslint": "^6.8.0",
-    "eslint-config-airbnb": "^18.0.1",
-    "eslint-plugin-import": "^2.19.1",
+    "eslint-config-airbnb": "^18.1.0",
+    "eslint-plugin-import": "^2.20.2",
     "eslint-plugin-jsx-a11y": "^6.2.3",
-    "eslint-plugin-react": "^7.17.0",
-    "eslint-plugin-react-hooks": "^2.3.0"
+    "eslint-plugin-react": "^7.19.0",
+    "eslint-plugin-react-hooks": "^2.5.1"
   },
-  "homepage": "https://github.com/Envisio/react-formula-bar",
+  "homepage": "https://envisio.github.io/react-formula-bar/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Envisio/react-formula-bar.git"
