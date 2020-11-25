@@ -21,6 +21,8 @@ import {
   each,
   partial,
   compact,
+  find,
+  pickBy,
 } from 'lodash';
 
 export default class FormulaBar extends Component {
@@ -32,6 +34,7 @@ export default class FormulaBar extends Component {
       items: PropTypes.arrayOf(PropTypes.shape({
         title: PropTypes.string.isRequired,
         description: PropTypes.string,
+        autocomplete: PropTypes.string,
       })),
     })),
     onChange: PropTypes.func,
@@ -73,6 +76,13 @@ export default class FormulaBar extends Component {
       listItemLabel: styles => styles,
       listItemDescription: styles => styles,
       listGroup: styles => styles,
+      docContainer: styles => styles,
+      docSignature: styles => styles,
+      docExample: styles => styles,
+      docDescription: styles => styles,
+      docArg: styles => styles,
+      docArgName: styles => styles,
+      docArgDescription: styles => styles,
     },
     onChange: () => { },
     disabled: false,
@@ -89,25 +99,57 @@ export default class FormulaBar extends Component {
       value,
       display: 'none',
       results: suggestions,
+      currentDoc: null,
       highlight: [0, 0],
     };
   }
 
-  onChange = (event) => {
+  generateSuggestions = (event) => {
+    const { suggestions } = this.props;
     const {
-      onChange,
-      suggestions,
-    } = this.props;
-    const {
-      target: { value },
+      target: {
+        value,
+        selectionStart,
+      },
     } = event;
-    const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
+    const valueTail = first(value.match(/[^A-Za-z\d]*(?:[A-Za-z]+\d*\(?[A-Za-z\d,'"]*)*$/g));
     let valueLast;
+    let insideFunc = false;
 
-    if (valueTail.match(/[A-Za-z\d]+$/g)) {
+    if (valueTail.match(/[A-Za-z]+\d*$/g)) {
       valueLast = last(valueTail.match(/[A-Za-z\d]+$/g));
+    } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g)) {
+      // in the context of a function
+      valueLast = replace(last(valueTail.match(/[A-Za-z]+\d*\(/g)), '(', '');
+      insideFunc = true;
     } else {
       valueLast = last(valueTail);
+    }
+
+    if (insideFunc) {
+      let result;
+
+      each(suggestions, ({ items }) => {
+        const foundItem = find(items, ({ title }) => title === valueLast);
+        if (foundItem) {
+          result = pickBy({
+            description: foundItem.description,
+            ...foundItem.docs,
+          });
+          return false;
+        }
+      });
+
+      if (!isEmpty(result)) {
+        this.setState({ display: 'doc' });
+      } else {
+        this.setState({ display: 'none' });
+      }
+
+      this.setState({ highlight: [0, 0] });
+      this.setState({ currentDoc: result });
+
+      return false;
     }
 
     let maxMatch = 0;
@@ -118,6 +160,8 @@ export default class FormulaBar extends Component {
       items: compact(map(items, ({
         title,
         description,
+        autocomplete,
+        docs,
       }) => {
         const indexEnd = toLower(title).indexOf(toLower(valueLast));
         const matchValue = title.substring(0, indexEnd + size(valueLast));
@@ -131,6 +175,11 @@ export default class FormulaBar extends Component {
               title,
               matchSize,
               description,
+              autocomplete,
+              docs: pickBy({
+                description,
+                ...docs,
+              }),
             };
           }
 
@@ -146,10 +195,18 @@ export default class FormulaBar extends Component {
       this.setState({ display: 'none' });
       this.setState({ highlight: [0, 0] });
     } else {
-      this.setState({ display: 'block' });
+      this.setState({ display: 'suggest' });
     }
 
     this.setState({ results: matchedGroups });
+  }
+
+  onChange = (event) => {
+    const { onChange } = this.props;
+    const {
+      target: { value },
+    } = event;
+    this.generateSuggestions(event);
     this.setState({ value }, () => onChange(value));
   }
 
@@ -188,40 +245,24 @@ export default class FormulaBar extends Component {
       case 'Enter':
         event.preventDefault();
 
-        if (eq(display, 'block')) {
-          const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
-          const valueLast = last(valueTail);
-          const currentTitle = get(results, [currentGroupIndex, 'items', currentItemIndex, 'title']);
-          const indexEnd = indexOf(split(toLower(currentTitle), ''), toLower(valueLast));
-          const matchValue = currentTitle.substring(0, indexEnd + 1);
-          const matchSize = size(matchValue);
-          const valueSize = size(value);
-          const startIndex = valueSize - matchSize;
-          this.setState({ value: `${value.substring(0, startIndex)}${currentTitle}` });
+        if (eq(display, 'suggest')) {
+          this.onAutocomplete(currentGroupIndex, currentItemIndex);
         } else {
           this.setState({ value });
+          this.setState({ display: 'none' });
         }
 
-        this.setState({ display: 'none' });
         break;
       case 'Tab':
         event.preventDefault();
 
-        if (eq(display, 'block')) {
-          const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
-          const valueLast = last(valueTail);
-          const currentTitle = get(results, [currentGroupIndex, 'items', currentItemIndex, 'title']);
-          const indexEnd = indexOf(split(toLower(currentTitle), ''), toLower(valueLast));
-          const matchValue = currentTitle.substring(0, indexEnd + 1);
-          const matchSize = size(matchValue);
-          const valueSize = size(value);
-          const startIndex = valueSize - matchSize;
-          this.setState({ value: `${value.substring(0, startIndex)}${currentTitle}` });
+        if (eq(display, 'suggest')) {
+          this.onAutocomplete(currentGroupIndex, currentItemIndex);
         } else {
           this.setState({ value });
+          this.setState({ display: 'none' });
         }
 
-        this.setState({ display: 'none' });
         break;
       case 'Backspace':
         this.setState({ display: 'none' });
@@ -234,21 +275,36 @@ export default class FormulaBar extends Component {
     }
   }
 
-  onClick = (groupIndex, itemIndex) => {
+  onAutocomplete = (groupIndex, itemIndex) => {
     const {
       results,
       value,
     } = this.state;
     const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
     const valueLast = last(valueTail);
-    const currentTitle = get(results, [groupIndex, 'items', itemIndex, 'title']);
+    // use autocomplete value or default to title
+    const currentTitle = get(results, [groupIndex, 'items', itemIndex, 'autocomplete']) ||
+      get(results, [groupIndex, 'items', itemIndex, 'title']);
     const indexEnd = indexOf(split(toLower(currentTitle), ''), toLower(valueLast));
     const matchValue = currentTitle.substring(0, indexEnd + 1);
     const matchSize = size(matchValue);
     const valueSize = size(value);
     const startIndex = valueSize - matchSize;
     this.setState({ value: `${value.substring(0, startIndex)}${currentTitle}` });
-    this.setState({ display: 'none' });
+
+    // show docs if available
+    const currentDoc = get(results, [groupIndex, 'items', itemIndex, 'docs']);
+
+    if (!isEmpty(currentDoc)) {
+      this.setState({ display: 'doc' });
+      this.setState({ currentDoc })
+    } else {
+      this.setState({ display: 'none' });
+    }
+  }
+
+  onClick = (groupIndex, itemIndex) => {
+    this.onAutocomplete(groupIndex, itemIndex);
   }
 
   onMouseOver = (groupIndex, itemIndex) => {
@@ -275,12 +331,20 @@ export default class FormulaBar extends Component {
       listItemLabel: listItemLabelStyle = styles => styles,
       listItemDescription: listItemDescriptionStyle = styles => styles,
       listGroup: listGroupStyle = styles => styles,
+      docContainer: docContainerStyle = styles => styles,
+      docSignature: docSignatureStyle = styles => styles,
+      docExample: docExampleStyle = styles => styles,
+      docDescription: docDescriptionStyle = styles => styles,
+      docArg: docArgStyle = styles => styles,
+      docArgName: docArgNameStyle = styles => styles,
+      docArgDescription: docArgDescriptionStyle = styles => styles,
     } = styles;
     const {
       value,
       highlight,
       results,
       display,
+      currentDoc,
     } = this.state;
 
     return (
@@ -347,10 +411,83 @@ export default class FormulaBar extends Component {
           type={type}
           onBlur={partial(onBlur, value)}
         />
+        <div
+          className={classes.docContainer}
+          style={docContainerStyle({
+            display: display === 'doc' ? 'block' : 'none',
+            top: '38px',
+            left: '-1px',
+            position: 'absolute',
+            width: '100%',
+            margin: 0,
+            backgroundColor: 'white',
+            borderRadius: '5px',
+            borderColor: 'dimgray',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            overflow: 'hidden',
+            padding: '6px 6px',
+          })}
+        >
+          <div
+            className={classes.docSignature}
+            style={docSignatureStyle({
+              fontWeight: 'bold',
+              paddingBottom: '6px',
+            })}
+          >
+            {currentDoc?.signature}
+          </div>
+          <div
+            className={classes.docDescription}
+            style={docDescriptionStyle({
+              paddingBottom: '6px',
+            })}
+          >
+            {currentDoc?.description}
+          </div>
+
+          <div
+            className={classes.docExample}
+            style={docExampleStyle({
+              color: 'gray',
+              paddingBottom: '6px',
+            })}
+          >
+            {currentDoc?.example ? `Example: ${currentDoc?.example}` : ''}
+          </div>
+          <>
+            {map(currentDoc?.args, (argName, argDesc) => (
+              <div
+                className={classes.docArg}
+                style={docArgStyle({
+                  color: 'gray',
+                })}
+              >
+                <span
+                  className={classes.docArgName}
+                  style={docArgNameStyle({
+                    fontWeight: 'bold',
+                  })}
+                >
+                  {`${argName}:`}
+                </span>
+                <span
+                  className={classes.docArgName}
+                  style={docArgNameStyle({
+                    paddingLeft: '5px',
+                  })}
+                >
+                  {argDesc}
+                </span>
+              </div>
+            ))}
+          </>
+        </div>
         <dl
           className={classes.listContainer}
           style={listContainerStyle({
-            display,
+            display: display === 'suggest' ? 'block' : 'none',
             top: '38px',
             left: '-1px',
             position: 'absolute',
