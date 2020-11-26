@@ -1,6 +1,6 @@
 {
   "name": "react-formula-bar",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "dependencies": {
     "lodash": "^4.17.15",
     "prop-types": "^15.7.2",
