@@ -5,7 +5,6 @@ import PropTypes from 'prop-types';
 const INPUT_MARGIN = 4;
 const MARGIN = 5;
 const MAX_HEIGHT = 300;
-const MIN_HEIGHT = 100;
 const MAX_WIDTH = 700;
 
 export default function Dropdown({
@@ -37,7 +36,6 @@ export default function Dropdown({
           position: 'absolute',
           maxHeight: maxContainerHeight,
           maxWidth: maxContainerWidth,
-          minHeight: MIN_HEIGHT,
           width: '100%',
           margin: 0,
           backgroundColor: 'white',
@@ -65,7 +63,6 @@ export default function Dropdown({
         position: 'absolute',
         maxHeight: maxContainerHeight,
         maxWidth: maxContainerWidth,
-        minHeight: MIN_HEIGHT,
         width: '100%',
         margin: 0,
         backgroundColor: 'white',

@@ -378,7 +378,7 @@ export default class FormulaBar extends Component {
           backgroundColor: 'white',
         })}
       >
-        <section
+        {/* <section
           className={classes.value}
           style={valueStyle({
             height: '34px',
@@ -401,7 +401,7 @@ export default class FormulaBar extends Component {
               return formula;
             })(),
           }}
-        />
+        /> */}
         <input
           className={classes.input}
           onChange={this.onChange}
@@ -411,14 +411,14 @@ export default class FormulaBar extends Component {
             borderStyle: 'none',
             outline: 'none',
             width: '100%',
-            padding: '0 6px',
+            // padding: '0 6px',
             lineHeight: '34px',
             height: '34px',
             fontSize: '14px',
             fontFamily: 'Monaco, Courier',
             position: 'absolute',
             top: 0,
-            color: 'transparent',
+            // color: 'transparent',
             caretColor: 'black',
             backgroundColor: 'transparent',
             overflow: 'hidden'
