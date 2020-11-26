@@ -35,6 +35,11 @@ export default class FormulaBar extends Component {
         title: PropTypes.string.isRequired,
         description: PropTypes.string,
         autocomplete: PropTypes.string,
+        docs: PropTypes.shape({
+          signature: PropTypes.string.isRequired,
+          example: PropTypes.string,
+          args: PropTypes.object,
+        }),
       })),
     })),
     onChange: PropTypes.func,
@@ -104,12 +109,36 @@ export default class FormulaBar extends Component {
     };
   }
 
-  generateSuggestions = (event) => {
+  generateDoc = (value) => {
+    const { suggestions } = this.props;
+    let result;
+
+    each(suggestions, ({ items }) => {
+      const foundItem = find(items, ({ title }) => toLower(title) === toLower(value));
+      if (foundItem) {
+        result = pickBy({
+          description: foundItem.description,
+          ...foundItem.docs,
+        });
+        return false;
+      }
+    });
+
+    if (!isEmpty(result)) {
+      this.setState({ display: 'doc' });
+    } else {
+      this.setState({ display: 'none' });
+    }
+
+    this.setState({ highlight: [0, 0] });
+    this.setState({ currentDoc: result });
+  }
+
+  generateSuggestions = (event, cursorPos) => {
     const { suggestions } = this.props;
     const {
       target: {
         value,
-        selectionStart,
       },
     } = event;
     const valueTail = first(value.match(/[^A-Za-z\d]*(?:[A-Za-z]+\d*\(?[A-Za-z\d,'"]*)*$/g));
@@ -127,28 +156,7 @@ export default class FormulaBar extends Component {
     }
 
     if (insideFunc) {
-      let result;
-
-      each(suggestions, ({ items }) => {
-        const foundItem = find(items, ({ title }) => title === valueLast);
-        if (foundItem) {
-          result = pickBy({
-            description: foundItem.description,
-            ...foundItem.docs,
-          });
-          return false;
-        }
-      });
-
-      if (!isEmpty(result)) {
-        this.setState({ display: 'doc' });
-      } else {
-        this.setState({ display: 'none' });
-      }
-
-      this.setState({ highlight: [0, 0] });
-      this.setState({ currentDoc: result });
-
+      this.generateDoc(valueLast);
       return false;
     }
 
@@ -244,7 +252,6 @@ export default class FormulaBar extends Component {
         break;
       case 'Enter':
         event.preventDefault();
-
         if (eq(display, 'suggest')) {
           this.onAutocomplete(currentGroupIndex, currentItemIndex);
         } else {
@@ -303,7 +310,7 @@ export default class FormulaBar extends Component {
     }
   }
 
-  onClick = (groupIndex, itemIndex) => {
+  onClickSuggestion = (groupIndex, itemIndex) => {
     this.onAutocomplete(groupIndex, itemIndex);
   }
 
@@ -367,6 +374,7 @@ export default class FormulaBar extends Component {
             height: '34px',
             lineHeight: '34px',
             padding: '0 6px',
+            overflow: 'hidden',
           })}
           dangerouslySetInnerHTML={{
             __html: (() => {
@@ -416,7 +424,7 @@ export default class FormulaBar extends Component {
           style={docContainerStyle({
             display: display === 'doc' ? 'block' : 'none',
             top: '38px',
-            left: '-1px',
+            left: '0px',
             position: 'absolute',
             width: '100%',
             margin: 0,
@@ -433,7 +441,8 @@ export default class FormulaBar extends Component {
             className={classes.docSignature}
             style={docSignatureStyle({
               fontWeight: 'bold',
-              paddingBottom: '6px',
+              lineHeight: '20px',
+              color: 'gray',
             })}
           >
             {currentDoc?.signature}
@@ -441,24 +450,25 @@ export default class FormulaBar extends Component {
           <div
             className={classes.docDescription}
             style={docDescriptionStyle({
-              paddingBottom: '6px',
+              lineHeight: '15px',
+              color: 'gray',
             })}
           >
             {currentDoc?.description}
           </div>
-
           <div
             className={classes.docExample}
             style={docExampleStyle({
               color: 'gray',
-              paddingBottom: '6px',
+              lineHeight: '20px',
             })}
           >
             {currentDoc?.example ? `Example: ${currentDoc?.example}` : ''}
           </div>
           <>
-            {map(currentDoc?.args, (argName, argDesc) => (
+            {map(currentDoc?.args, (argDesc, argName) => (
               <div
+                key={join(['doc', 'arg', argName], '-')}
                 className={classes.docArg}
                 style={docArgStyle({
                   color: 'gray',
@@ -473,8 +483,8 @@ export default class FormulaBar extends Component {
                   {`${argName}:`}
                 </span>
                 <span
-                  className={classes.docArgName}
-                  style={docArgNameStyle({
+                  className={classes.docDescription}
+                  style={docDescriptionStyle({
                     paddingLeft: '5px',
                   })}
                 >
@@ -489,7 +499,7 @@ export default class FormulaBar extends Component {
           style={listContainerStyle({
             display: display === 'suggest' ? 'block' : 'none',
             top: '38px',
-            left: '-1px',
+            left: '0px',
             position: 'absolute',
             width: '100%',
             margin: 0,
@@ -535,7 +545,7 @@ export default class FormulaBar extends Component {
                         highlight,
                         suggestions,
                       })}
-                      onClick={partial(this.onClick, groupIndex, itemIndex)}
+                      onClick={partial(this.onClickSuggestion, groupIndex, itemIndex)}
                       onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
                       onFocus={partial(this.onMouseOver, groupIndex, itemIndex)}
                     >
