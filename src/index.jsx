@@ -261,9 +261,8 @@ export default class FormulaBar extends Component {
 
         break;
       case 'Tab':
-        event.preventDefault();
-
         if (eq(display, 'suggest')) {
+          event.preventDefault();
           this.onAutocomplete(currentGroupIndex, currentItemIndex);
         } else {
           this.setState({ value });
@@ -417,7 +416,10 @@ export default class FormulaBar extends Component {
           disabled={disabled}
           placeholder={placeholder}
           type={type}
-          onBlur={partial(onBlur, value)}
+          onBlur={() => {
+            this.setState({ display: 'none' });
+            onBlur(value);
+          }}
         />
         <div
           className={classes.docContainer}
