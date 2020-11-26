@@ -1,4 +1,4 @@
-import React, { Component, Fragment } from 'react';
+import React, { Component, Fragment, createRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   isEmpty,
@@ -24,6 +24,7 @@ import {
   find,
   pickBy,
 } from 'lodash';
+import Dropdown from './dropdown';
 
 export default class FormulaBar extends Component {
   static propTypes = {
@@ -66,6 +67,7 @@ export default class FormulaBar extends Component {
     onBlur: PropTypes.func,
     readonly: PropTypes.bool,
     type: PropTypes.string,
+    dropdownPortalTarget: PropTypes.instanceOf(Element),
   };
 
   static defaultProps = {
@@ -76,12 +78,14 @@ export default class FormulaBar extends Component {
       container: styles => styles,
       value: styles => styles,
       input: styles => styles,
-      listContainer: styles => styles,
+      dropdownContainer: styles => styles,
+      suggestContent: styles => styles,
       listItem: styles => styles,
       listItemLabel: styles => styles,
       listItemDescription: styles => styles,
       listGroup: styles => styles,
       docContainer: styles => styles,
+      docContent: styles => styles,
       docSignature: styles => styles,
       docExample: styles => styles,
       docDescription: styles => styles,
@@ -95,11 +99,13 @@ export default class FormulaBar extends Component {
     onBlur: () => { },
     readonly: false,
     type: 'text',
+    dropdownPortalTarget: undefined,
   };
 
   constructor(props) {
     super(props);
     const { value, suggestions } = this.props;
+    this.containerRef = createRef();
     this.state = {
       value,
       display: 'none',
@@ -327,17 +333,21 @@ export default class FormulaBar extends Component {
       readonly,
       onBlur,
       placeholder,
+      dropdownPortalTarget,
     } = this.props;
+
     const {
       container: containerStyle = styles => styles,
       value: valueStyle = styles => styles,
       input: inputStyle = styles => styles,
-      listContainer: listContainerStyle = styles => styles,
+      dropdownContainer: dropdownContainerStyle = styles => styles,
+      suggestContent: suggestContentStyle = styles => styles,
       listItem: listItemStyle = styles => styles,
       listItemLabel: listItemLabelStyle = styles => styles,
       listItemDescription: listItemDescriptionStyle = styles => styles,
       listGroup: listGroupStyle = styles => styles,
       docContainer: docContainerStyle = styles => styles,
+      docContent: docContentStyle = styles => styles,
       docSignature: docSignatureStyle = styles => styles,
       docExample: docExampleStyle = styles => styles,
       docDescription: docDescriptionStyle = styles => styles,
@@ -355,6 +365,7 @@ export default class FormulaBar extends Component {
 
     return (
       <div
+        ref={this.containerRef}
         className={classes.container}
         style={containerStyle({
           width: '100%',
@@ -383,7 +394,7 @@ export default class FormulaBar extends Component {
                 items,
               }) => {
                 each(items, ({ title }) => {
-                  formula = replace(replace(formula, new RegExp(`(${replace(title, /[|\\{}()[\]^$+*?.-]/g, '\\$&')})`, 'g'), `<span style="color:${color}">$1</span>`), '  ', ' &nbsp;');
+                  formula = replace(replace(formula, new RegExp(`\\b(${replace(title, /[|\\{}()[\]^$+*?.-]/g, '\\$&')})\\b`, 'g'), `<span style="color:${color}">$1</span>`), '  ', ' &nbsp;');
                 });
               });
 
@@ -421,162 +432,159 @@ export default class FormulaBar extends Component {
             onBlur(value);
           }}
         />
-        <div
-          className={classes.docContainer}
-          style={docContainerStyle({
-            display: display === 'doc' ? 'block' : 'none',
-            top: '38px',
-            left: '0px',
-            position: 'absolute',
-            width: '100%',
-            margin: 0,
-            backgroundColor: 'white',
-            borderRadius: '5px',
-            borderColor: 'dimgray',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-            overflow: 'hidden',
-            padding: '6px 6px',
-          })}
+        <Dropdown
+          container={dropdownPortalTarget}
+          inputContainer={this.containerRef.current}
+          className={classes.dropdownContainer}
+          styles={dropdownContainerStyle}
+          isOpen={display !== 'none'}
         >
-          <div
-            className={classes.docSignature}
-            style={docSignatureStyle({
-              fontWeight: 'bold',
-              lineHeight: '20px',
-              color: 'gray',
-            })}
-          >
-            {currentDoc?.signature}
-          </div>
-          <div
-            className={classes.docDescription}
-            style={docDescriptionStyle({
-              lineHeight: '15px',
-              color: 'gray',
-            })}
-          >
-            {currentDoc?.description}
-          </div>
-          <div
-            className={classes.docExample}
-            style={docExampleStyle({
-              color: 'gray',
-              lineHeight: '20px',
-            })}
-          >
-            {currentDoc?.example ? `Example: ${currentDoc?.example}` : ''}
-          </div>
-          <>
-            {map(currentDoc?.args, (argDesc, argName) => (
-              <div
-                key={join(['doc', 'arg', argName], '-')}
-                className={classes.docArg}
-                style={docArgStyle({
-                  color: 'gray',
-                })}
-              >
-                <span
-                  className={classes.docArgName}
-                  style={docArgNameStyle({
-                    fontWeight: 'bold',
-                  })}
-                >
-                  {`${argName}:`}
-                </span>
-                <span
-                  className={classes.docDescription}
-                  style={docDescriptionStyle({
-                    paddingLeft: '5px',
-                  })}
-                >
-                  {argDesc}
-                </span>
-              </div>
-            ))}
-          </>
-        </div>
-        <dl
-          className={classes.listContainer}
-          style={listContainerStyle({
-            display: display === 'suggest' ? 'block' : 'none',
-            top: '38px',
-            left: '0px',
-            position: 'absolute',
-            width: '100%',
-            margin: 0,
-            backgroundColor: 'white',
-            borderRadius: '5px',
-            borderColor: 'dimgray',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-            overflow: 'hidden',
-          })}
-        >
-          {map(results, ({
-            type,
-            items,
-          }, groupIndex) => (
-              <Fragment key={join(['suggestion', 'group', type], '-')}>
-                <dt
-                  className={classes.listGroup}
-                  style={listGroupStyle({
-                    fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
-                    padding: '0 6px',
-                    color: 'gray',
-                  })}
-                >
-                  {type}
-                </dt>
-                {map(items, ({
-                  title,
-                  description,
-                }, itemIndex) => (
-                    <dd
-                      className={classes.listItem}
-                      key={join(['suggestion', 'group', type, 'item', title], '-')}
-                      style={listItemStyle({
-                        marginLeft: 0,
-                        padding: '0 6px',
-                        lineHeight: '28px',
-                        backgroundColor: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'gainsboro' : 'white',
-                        cursor: 'pointer',
-                      }, {
-                        groupIndex,
-                        itemIndex,
-                        highlight,
-                        suggestions,
+          {(() => {
+            switch (display) {
+              case 'doc':
+                return (
+                  <div
+                    className={classes.docContent}
+                    style={docContentStyle({
+                      padding: '6px'
+                    })}
+                  >
+                    <div
+                      className={classes.docSignature}
+                      style={docSignatureStyle({
+                        fontWeight: 'bold',
+                        lineHeight: '20px',
+                        color: 'gray',
                       })}
-                      onClick={partial(this.onClickSuggestion, groupIndex, itemIndex)}
-                      onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
-                      onFocus={partial(this.onMouseOver, groupIndex, itemIndex)}
                     >
-                      <label
-                        className={classes.listItemLabel}
-                        style={listItemLabelStyle({ fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined }, {
-                          groupIndex,
-                          itemIndex,
-                          highlight,
-                          suggestions,
-                        })}
-                      >
-                        {title}
-                      </label>
-                      <i
-                        className={classes.listItemDescription}
-                        style={listItemDescriptionStyle({
-                          paddingLeft: '14px',
-                          margin: 0,
-                          color: 'gray',
-                        })}
-                      >
-                        {description}
-                      </i>
-                    </dd>
-                  ))}
-              </Fragment>
-            ))}
-        </dl>
+                      {currentDoc?.signature}
+                    </div>
+                    <div
+                      className={classes.docDescription}
+                      style={docDescriptionStyle({
+                        lineHeight: '15px',
+                        color: 'gray',
+                      })}
+                    >
+                      {currentDoc?.description}
+                    </div>
+                    <div
+                      className={classes.docExample}
+                      style={docExampleStyle({
+                        color: 'gray',
+                        lineHeight: '20px',
+                      })}
+                    >
+                      {currentDoc?.example ? `Example: ${currentDoc?.example}` : ''}
+                    </div>
+                    <>
+                      {map(currentDoc?.args, (argDesc, argName) => (
+                        <div
+                          key={join(['doc', 'arg', argName], '-')}
+                          className={classes.docArg}
+                          style={docArgStyle({
+                            color: 'gray',
+                          })}
+                        >
+                          <span
+                            className={classes.docArgName}
+                            style={docArgNameStyle({
+                              fontWeight: 'bold',
+                            })}
+                          >
+                            {`${argName}:`}
+                          </span>
+                          <span
+                            className={classes.docDescription}
+                            style={docDescriptionStyle({
+                              paddingLeft: '5px',
+                            })}
+                          >
+                            {argDesc}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  </div>
+                )
+              case 'suggest':
+                return (
+                  <dl
+                    className={classes.suggestContent}
+                    style={suggestContentStyle({
+                      margin: 0,
+                    })}
+                  >
+                    {map(results, ({
+                      type,
+                      items,
+                    }, groupIndex) => (
+                        <Fragment key={join(['suggestion', 'group', type], '-')}>
+                          <dt
+                            className={classes.listGroup}
+                            style={listGroupStyle({
+                              fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
+                              padding: '0 6px',
+                              color: 'gray',
+                            })}
+                          >
+                            {type}
+                          </dt>
+                          {map(items, ({
+                            title,
+                            description,
+                          }, itemIndex) => (
+                              <dd
+                                className={classes.listItem}
+                                key={join(['suggestion', 'group', type, 'item', title], '-')}
+                                style={listItemStyle({
+                                  marginLeft: 0,
+                                  padding: '0 6px',
+                                  lineHeight: '28px',
+                                  backgroundColor: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'gainsboro' : 'white',
+                                  cursor: 'pointer',
+                                }, {
+                                  groupIndex,
+                                  itemIndex,
+                                  highlight,
+                                  suggestions,
+                                })}
+                                onClick={partial(this.onClickSuggestion, groupIndex, itemIndex)}
+                                onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
+                                onFocus={partial(this.onMouseOver, groupIndex, itemIndex)}
+                              >
+                                <label
+                                  className={classes.listItemLabel}
+                                  style={listItemLabelStyle({ fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined }, {
+                                    groupIndex,
+                                    itemIndex,
+                                    highlight,
+                                    suggestions,
+                                  })}
+                                >
+                                  {title}
+                                </label>
+                                <i
+                                  className={classes.listItemDescription}
+                                  style={listItemDescriptionStyle({
+                                    paddingLeft: '14px',
+                                    margin: 0,
+                                    color: 'gray',
+                                  })}
+                                >
+                                  {description}
+                                </i>
+                              </dd>
+                            ))}
+                        </Fragment>
+                      ))}
+                  </dl>
+                );
+              default:
+                return '';
+            }
+          })()}
+        </Dropdown>
       </div>
     );
   }
