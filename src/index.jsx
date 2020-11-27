@@ -26,6 +26,20 @@ import {
 } from 'lodash';
 import Dropdown from './dropdown';
 
+const isElementVisible = (el, container) => {
+  if (!el || !container) {
+    return false;
+  }
+
+  const top = el.offsetTop;
+  const bottom = el.offsetTop + el.clientHeight;
+
+  return (
+      top >= container.scrollTop &&
+      bottom <= (container.scrollTop + container.clientHeight)
+  );
+}
+
 export default class FormulaBar extends Component {
   static propTypes = {
     value: PropTypes.string,
@@ -106,6 +120,7 @@ export default class FormulaBar extends Component {
     super(props);
     const { value, suggestions } = this.props;
     this.containerRef = createRef();
+    this.dropdownContainerRef = createRef();
     this.state = {
       value,
       display: 'none',
@@ -140,7 +155,7 @@ export default class FormulaBar extends Component {
     this.setState({ currentDoc: result });
   }
 
-  generateSuggestions = (event, cursorPos) => {
+  generateSuggestions = (event) => {
     const { suggestions } = this.props;
     const {
       target: {
@@ -232,6 +247,8 @@ export default class FormulaBar extends Component {
       display,
       value,
     } = this.state;
+    let newGroupIndex = currentGroupIndex;
+    let newItemIndex = currentItemIndex;
 
     switch (key) {
       case 'ArrowDown':
@@ -239,9 +256,19 @@ export default class FormulaBar extends Component {
 
         if (!isEmpty(results)) {
           if (has(results, [currentGroupIndex, 'items', currentItemIndex + 1])) {
-            this.setState({ highlight: [currentGroupIndex, currentItemIndex + 1] });
+            newItemIndex = currentItemIndex + 1;
           } else if (has(results, [currentGroupIndex + 1])) {
-            this.setState({ highlight: [currentGroupIndex + 1, 0] });
+            newGroupIndex = currentGroupIndex + 1;
+            newItemIndex = 0;
+          }
+
+          this.setState({ highlight: [newGroupIndex, newItemIndex] });
+
+          const { type } = get(results, newGroupIndex);
+          const { title } = get(results, [newGroupIndex, 'items', newItemIndex]);
+          const highlightedItem = document.querySelector(`[data-id="${join([type, title], '-')}"]`)
+          if (!isElementVisible(highlightedItem, this.dropdownContainerRef.current)) {
+            highlightedItem.scrollIntoView(false);
           }
         }
         break;
@@ -250,9 +277,19 @@ export default class FormulaBar extends Component {
 
         if (!isEmpty(results)) {
           if (gt(currentItemIndex, 0)) {
-            this.setState({ highlight: [currentGroupIndex, currentItemIndex - 1] });
+            newItemIndex = currentItemIndex - 1;
           } else if (gt(currentGroupIndex, 0)) {
-            this.setState({ highlight: [currentGroupIndex - 1, size(get(results, [currentGroupIndex - 1, 'items'])) - 1] });
+            newGroupIndex = currentGroupIndex - 1;
+            newItemIndex = size(get(results, [newGroupIndex, 'items'])) - 1;
+          }
+
+          this.setState({ highlight: [newGroupIndex, newItemIndex] });
+          const { type } = get(results, newGroupIndex);
+          const { title } = get(results, [newGroupIndex, 'items', newItemIndex]);
+          const highlightedItem = document.querySelector(`[data-id="${join([type, title], '-')}"]`)
+
+          if (!isElementVisible(highlightedItem, this.dropdownContainerRef.current)) {
+            highlightedItem.scrollIntoView();
           }
         }
         break;
@@ -346,7 +383,6 @@ export default class FormulaBar extends Component {
       listItemLabel: listItemLabelStyle = styles => styles,
       listItemDescription: listItemDescriptionStyle = styles => styles,
       listGroup: listGroupStyle = styles => styles,
-      docContainer: docContainerStyle = styles => styles,
       docContent: docContentStyle = styles => styles,
       docSignature: docSignatureStyle = styles => styles,
       docExample: docExampleStyle = styles => styles,
@@ -433,6 +469,7 @@ export default class FormulaBar extends Component {
           }}
         />
         <Dropdown
+          ref={this.dropdownContainerRef}
           container={dropdownPortalTarget}
           inputContainer={this.containerRef.current}
           className={classes.dropdownContainer}
@@ -496,7 +533,7 @@ export default class FormulaBar extends Component {
                           </span>
                           <span
                             className={classes.docDescription}
-                            style={docDescriptionStyle({
+                            style={docArgDescriptionStyle({
                               paddingLeft: '5px',
                             })}
                           >
@@ -535,12 +572,12 @@ export default class FormulaBar extends Component {
                             description,
                           }, itemIndex) => (
                               <dd
+                                data-id={join([type, title], '-')}
                                 className={classes.listItem}
                                 key={join(['suggestion', 'group', type, 'item', title], '-')}
                                 style={listItemStyle({
                                   marginLeft: 0,
-                                  padding: '0 6px',
-                                  lineHeight: '28px',
+                                  padding: '5px 6px',
                                   backgroundColor: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'gainsboro' : 'white',
                                   cursor: 'pointer',
                                 }, {
