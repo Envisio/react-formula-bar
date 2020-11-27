@@ -252,9 +252,9 @@ export default class FormulaBar extends Component {
 
     switch (key) {
       case 'ArrowDown':
-        event.preventDefault();
+        if (eq(display, 'suggest') && !isEmpty(results)) {
+          event.preventDefault();
 
-        if (!isEmpty(results)) {
           if (has(results, [currentGroupIndex, 'items', currentItemIndex + 1])) {
             newItemIndex = currentItemIndex + 1;
           } else if (has(results, [currentGroupIndex + 1])) {
@@ -273,9 +273,9 @@ export default class FormulaBar extends Component {
         }
         break;
       case 'ArrowUp':
-        event.preventDefault();
+        if (eq(display, 'suggest') && !isEmpty(results)) {
+          event.preventDefault();
 
-        if (!isEmpty(results)) {
           if (gt(currentItemIndex, 0)) {
             newItemIndex = currentItemIndex - 1;
           } else if (gt(currentGroupIndex, 0)) {
