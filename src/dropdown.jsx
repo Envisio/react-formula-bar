@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 
@@ -7,13 +7,14 @@ const MARGIN = 5;
 const MAX_HEIGHT = 300;
 const MAX_WIDTH = 700;
 
-export default function Dropdown({
+function Dropdown({
   container,
   inputContainer,
   children,
   className,
   styles,
   isOpen,
+  forwardedRef,
 }) {
   if (!inputContainer) {
     return '';
@@ -28,6 +29,7 @@ export default function Dropdown({
   if (container && inputContainer) {
     const dropdown = (
       <div
+        ref={forwardedRef}
         className={className}
         style={styles({
           display: isOpen ? 'block' : 'none',
@@ -43,7 +45,7 @@ export default function Dropdown({
           borderColor: 'dimgray',
           borderWidth: '1px',
           borderStyle: 'solid',
-          overflow: 'hidden',
+          overflowX: 'hidden',
         })}
       >
         {children}
@@ -55,6 +57,7 @@ export default function Dropdown({
 
   return (
     <div
+      ref={forwardedRef}
       className={className}
       style={styles({
         display: isOpen ? 'block' : 'none',
@@ -85,6 +88,9 @@ Dropdown.propTypes = {
   styles: PropTypes.func,
   className: PropTypes.string,
   isOpen: PropTypes.bool.isRequired,
+  forwardedRef: PropTypes.shape({
+    current: PropTypes.any,
+  }),
 };
 
 Dropdown.defaultProps = {
@@ -93,4 +99,9 @@ Dropdown.defaultProps = {
   inputContainer: undefined,
   styles: (styles) => styles,
   className: undefined,
+  forwardedRef: undefined,
 };
+
+export default forwardRef((props, ref) => (
+  <Dropdown {...props} forwardedRef={ref} />
+));
