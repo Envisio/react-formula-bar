@@ -18,3 +18,4 @@ jobs:
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.npm_token}}
+      - run: curl -X POST -H 'Content-type: application/json' --data '{"text":"npm `react-formula-bar` published."}' https://hooks.slack.com/services/${{secrets.slack_channel}}
