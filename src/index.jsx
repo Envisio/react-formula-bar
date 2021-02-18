@@ -78,6 +78,7 @@ export default class FormulaBar extends Component {
     }),
     disabled: PropTypes.bool,
     placeholder: PropTypes.string,
+    onFocus: PropTypes.func,
     onBlur: PropTypes.func,
     readonly: PropTypes.bool,
     type: PropTypes.string,
@@ -110,6 +111,7 @@ export default class FormulaBar extends Component {
     onChange: () => { },
     disabled: false,
     placeholder: '',
+    onFocus: () => { },
     onBlur: () => { },
     readonly: false,
     type: 'text',
@@ -368,6 +370,7 @@ export default class FormulaBar extends Component {
       type,
       disabled,
       readonly,
+      onFocus,
       onBlur,
       placeholder,
       dropdownPortalTarget,
@@ -463,6 +466,7 @@ export default class FormulaBar extends Component {
           disabled={disabled}
           placeholder={placeholder}
           type={type}
+          onFocus={onFocus}
           onBlur={() => {
             this.setState({ display: 'none' });
             onBlur(value);
