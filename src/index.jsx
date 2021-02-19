@@ -354,7 +354,8 @@ export default class FormulaBar extends Component {
     }
   }
 
-  onClickSuggestion = (groupIndex, itemIndex) => {
+  onClickSuggestion = (groupIndex, itemIndex, event) => {
+    event.preventDefault();
     this.onAutocomplete(groupIndex, itemIndex);
   }
 
@@ -590,7 +591,7 @@ export default class FormulaBar extends Component {
                                   highlight,
                                   suggestions,
                                 })}
-                                onClick={partial(this.onClickSuggestion, groupIndex, itemIndex)}
+                                onMouseDown={partial(this.onClickSuggestion, groupIndex, itemIndex)}
                                 onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
                                 onFocus={partial(this.onMouseOver, groupIndex, itemIndex)}
                               >
