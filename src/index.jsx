@@ -1,30 +1,15 @@
-import React, { Component, Fragment, createRef } from 'react';
-import PropTypes from 'prop-types';
+import React, { Component, Fragment, createRef } from "react";
 import {
-  isEmpty,
-  first,
-  map,
-  join,
-  toLower,
-  filter,
-  endsWith,
-  split,
-  indexOf,
-  reject,
-  eq,
-  last,
-  gt,
-  size,
-  get,
-  has,
-  replace,
-  each,
-  partial,
-  compact,
-  find,
-  pickBy,
-} from 'lodash';
-import Dropdown from './dropdown';
+  arrayOf,
+  bool,
+  func,
+  instanceOf,
+  object,
+  shape,
+  string,
+} from "prop-types";
+import { isEmpty, last, get, has, partial, map } from "lodash";
+import Dropdown from "./dropdown";
 
 const isElementVisible = (el, container) => {
   if (!el || !container) {
@@ -35,97 +20,191 @@ const isElementVisible = (el, container) => {
   const bottom = el.offsetTop + el.clientHeight;
 
   return (
-      top >= container.scrollTop &&
-      bottom <= (container.scrollTop + container.clientHeight)
+    top >= container.scrollTop &&
+    bottom <= container.scrollTop + container.clientHeight
   );
-}
+};
+const suggestionWorker = () => {
+  // This must be ES3 and no importings
+  self.onmessage = function ({ data: { value = "", suggestions = [] } }) {
+    const valueTail = value.match(
+      /[^A-Za-z\d]*(?:[A-Za-z]+\d*\(?[A-Za-z\d,'"]*)*$/g
+    )[0];
+    let valueLast;
+    let insideFunc = false;
+
+    if (valueTail.match(/[A-Za-z]+\d*$/g)) {
+      valueLast = valueTail.match(/[A-Za-z\d]+$/g).reverse()[0];
+    } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g)) {
+      // in the context of a function
+      valueLast = valueTail
+        .match(/[A-Za-z]+\d*\(/g)
+        .reverse()[0]
+        .replace("(", "");
+      insideFunc = true;
+    } else {
+      valueLast = valueTail.reverse()[0];
+    }
+
+    if (insideFunc) {
+      suggestions.forEach(({ items }) => {
+        const foundItem = items.find(
+          ({ title }) => title.toLowerCase() === valueLast.toLowerCase()
+        );
+
+        if (foundItem) {
+          const { description: itemDescription, docs: itemDocs } = foundItem;
+          const result = Object.assign(
+            { description: itemDescription },
+            itemDocs
+          );
+
+          self.postMessage({ result });
+
+          return false;
+        }
+      });
+
+      return false;
+    }
+
+    let maxMatch = 0;
+    const matchedGroups = suggestions
+      .map(({ items, type, color }) => ({
+        items: items
+          .map(({ title, description, autocomplete, docs }) => {
+            const indexEnd = title
+              .toLowerCase()
+              .indexOf(valueLast.toLowerCase());
+            const matchValue = title.substring(0, indexEnd + valueLast.length);
+            const matchSize = matchValue.length;
+
+            if (
+              matchSize > 0 &&
+              valueTail.toLowerCase().endsWith(matchValue.toLowerCase()) &&
+              matchSize < title.length
+            ) {
+              maxMatch = matchSize > maxMatch ? matchSize : maxMatch;
+
+              if (matchSize >= maxMatch) {
+                return {
+                  title,
+                  matchSize,
+                  description,
+                  autocomplete,
+                  docs: Object.assign({ description }, docs),
+                };
+              }
+
+              return undefined;
+            }
+
+            return undefined;
+          })
+          .filter((item) => !!item),
+        type,
+        color,
+      }))
+      .filter(
+        ({ items }) =>
+          !!items.filter(({ matchSize }) => matchSize === maxMatch).length
+      );
+
+    self.postMessage({ matchedGroups });
+  };
+};
 
 export default class FormulaBar extends Component {
   static propTypes = {
-    value: PropTypes.string,
-    suggestions: PropTypes.arrayOf(PropTypes.shape({
-      type: PropTypes.string.isRequired,
-      color: PropTypes.string,
-      items: PropTypes.arrayOf(PropTypes.shape({
-        title: PropTypes.string.isRequired,
-        description: PropTypes.string,
-        autocomplete: PropTypes.string,
-        docs: PropTypes.shape({
-          signature: PropTypes.string.isRequired,
-          example: PropTypes.string,
-          args: PropTypes.object,
-        }),
-      })),
-    })),
-    onChange: PropTypes.func,
-    classes: PropTypes.shape({
-      container: PropTypes.string,
-      value: PropTypes.string,
-      input: PropTypes.string,
-      listItem: PropTypes.string,
-      listItemLabel: PropTypes.string,
-      listItemDescription: PropTypes.string,
-      listGroup: PropTypes.string,
+    value: string,
+    suggestions: arrayOf(
+      shape({
+        type: string.isRequired,
+        color: string,
+        items: arrayOf(
+          shape({
+            title: string.isRequired,
+            description: string,
+            autocomplete: string,
+            docs: shape({
+              signature: string.isRequired,
+              example: string,
+              args: object,
+            }),
+          })
+        ),
+      })
+    ),
+    onChange: func,
+    classes: shape({
+      container: string,
+      value: string,
+      input: string,
+      listItem: string,
+      listItemLabel: string,
+      listItemDescription: string,
+      listGroup: string,
     }),
-    styles: PropTypes.shape({
-      container: PropTypes.func,
-      value: PropTypes.func,
-      input: PropTypes.func,
-      listItem: PropTypes.func,
-      listItemLabel: PropTypes.func,
-      listItemDescription: PropTypes.func,
-      listGroup: PropTypes.func,
+    styles: shape({
+      container: func,
+      value: func,
+      input: func,
+      listItem: func,
+      listItemLabel: func,
+      listItemDescription: func,
+      listGroup: func,
     }),
-    disabled: PropTypes.bool,
-    placeholder: PropTypes.string,
-    onFocus: PropTypes.func,
-    onBlur: PropTypes.func,
-    readonly: PropTypes.bool,
-    type: PropTypes.string,
-    dropdownPortalTarget: PropTypes.instanceOf(Element),
+    disabled: bool,
+    placeholder: string,
+    onFocus: func,
+    onBlur: func,
+    readonly: bool,
+    type: string,
+    dropdownPortalTarget: instanceOf(Element),
   };
 
   static defaultProps = {
-    value: '',
+    value: "",
     suggestions: [],
     classes: {},
     styles: {
-      container: styles => styles,
-      value: styles => styles,
-      input: styles => styles,
-      dropdownContainer: styles => styles,
-      suggestContent: styles => styles,
-      listItem: styles => styles,
-      listItemLabel: styles => styles,
-      listItemDescription: styles => styles,
-      listGroup: styles => styles,
-      docContainer: styles => styles,
-      docContent: styles => styles,
-      docSignature: styles => styles,
-      docExample: styles => styles,
-      docDescription: styles => styles,
-      docArg: styles => styles,
-      docArgName: styles => styles,
-      docArgDescription: styles => styles,
+      container: (styles) => styles,
+      value: (styles) => styles,
+      input: (styles) => styles,
+      dropdownContainer: (styles) => styles,
+      suggestContent: (styles) => styles,
+      listItem: (styles) => styles,
+      listItemLabel: (styles) => styles,
+      listItemDescription: (styles) => styles,
+      listGroup: (styles) => styles,
+      docContainer: (styles) => styles,
+      docContent: (styles) => styles,
+      docSignature: (styles) => styles,
+      docExample: (styles) => styles,
+      docDescription: (styles) => styles,
+      docArg: (styles) => styles,
+      docArgName: (styles) => styles,
+      docArgDescription: (styles) => styles,
     },
-    onChange: () => { },
+    onChange: () => {},
     disabled: false,
-    placeholder: '',
-    onFocus: () => { },
-    onBlur: () => { },
+    placeholder: "",
+    onFocus: () => {},
+    onBlur: () => {},
     readonly: false,
-    type: 'text',
+    type: "text",
     dropdownPortalTarget: undefined,
   };
 
   constructor(props) {
     super(props);
+
     const { value, suggestions } = this.props;
     this.containerRef = createRef();
     this.dropdownContainerRef = createRef();
     this.state = {
       value,
-      display: 'none',
+      display: "none",
       results: suggestions,
       currentDoc: null,
       highlight: [0, 0],
@@ -136,110 +215,147 @@ export default class FormulaBar extends Component {
     const { suggestions } = this.props;
     let result;
 
-    each(suggestions, ({ items }) => {
-      const foundItem = find(items, ({ title }) => toLower(title) === toLower(value));
+    suggestions.forEach(({ items }) => {
+      const foundItem = items.find(
+        ({ title }) => title.toLowerCase() === value.toLowerCase()
+      );
+
       if (foundItem) {
-        result = pickBy({
-          description: foundItem.description,
-          ...foundItem.docs,
-        });
+        result = { description: foundItem.description, ...foundItem.docs };
+
         return false;
       }
     });
 
     if (!isEmpty(result)) {
-      this.setState({ display: 'doc' });
+      this.setState({ display: "doc" });
     } else {
-      this.setState({ display: 'none' });
+      this.setState({ display: "none" });
     }
 
     this.setState({ highlight: [0, 0] });
     this.setState({ currentDoc: result });
-  }
+  };
 
-  generateSuggestions = (event) => {
-    const { suggestions } = this.props;
-    const {
-      target: {
-        value,
-      },
-    } = event;
-    const valueTail = first(value.match(/[^A-Za-z\d]*(?:[A-Za-z]+\d*\(?[A-Za-z\d,'"]*)*$/g));
+  generateSuggestions = ({ value = "", suggestions }) => {
+    const [valueTail] = value.match(
+      /[^A-Za-z\d]*(?:[A-Za-z]+\d*\(?[A-Za-z\d,'"]*)*$/g
+    );
     let valueLast;
     let insideFunc = false;
 
     if (valueTail.match(/[A-Za-z]+\d*$/g)) {
-      valueLast = last(valueTail.match(/[A-Za-z\d]+$/g));
+      [valueLast] = valueTail.match(/[A-Za-z\d]+$/g).reverse();
     } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g)) {
       // in the context of a function
-      valueLast = replace(last(valueTail.match(/[A-Za-z]+\d*\(/g)), '(', '');
+      valueLast = valueTail
+        .match(/[A-Za-z]+\d*\(/g)
+        .reverse()[0]
+        .replace("(", "");
       insideFunc = true;
     } else {
-      valueLast = last(valueTail);
+      [valueLast] = valueTail.reverse();
     }
 
     if (insideFunc) {
       this.generateDoc(valueLast);
+
       return false;
     }
 
     let maxMatch = 0;
-    const matchedGroups = reject(map(suggestions, ({
-      items,
-      ...props
-    }) => ({
-      items: compact(map(items, ({
-        title,
-        description,
-        autocomplete,
-        docs,
-      }) => {
-        const indexEnd = toLower(title).indexOf(toLower(valueLast));
-        const matchValue = title.substring(0, indexEnd + size(valueLast));
-        const matchSize = size(matchValue);
+    const matchedGroups = suggestions
+      .map(({ items, ...props }) => ({
+        items: items
+          .map(({ title, description, autocomplete, docs }) => {
+            const indexEnd = title
+              .toLowerCase()
+              .indexOf(valueLast.toLowerCase());
+            const matchValue = title.substring(0, indexEnd + valueLast.length);
+            const matchSize = matchValue.length;
 
-        if (gt(matchSize, 0) && endsWith(toLower(valueTail), toLower(matchValue)) && matchSize < size(title)) {
-          maxMatch = matchSize > maxMatch ? matchSize : maxMatch;
+            if (
+              matchSize > 0 &&
+              valueTail.toLowerCase().endsWith(matchValue.toLowerCase()) &&
+              matchSize < title.length
+            ) {
+              maxMatch = matchSize > maxMatch ? matchSize : maxMatch;
 
-          if (matchSize >= maxMatch) {
-            return {
-              title,
-              matchSize,
-              description,
-              autocomplete,
-              docs: pickBy({
-                description,
-                ...docs,
-              }),
-            };
-          }
+              if (matchSize >= maxMatch) {
+                return {
+                  title,
+                  matchSize,
+                  description,
+                  autocomplete,
+                  docs: { description, ...docs },
+                };
+              }
 
-          return undefined;
-        }
+              return undefined;
+            }
 
-        return undefined;
-      })),
-      ...props,
-    })), ({ items }) => isEmpty(filter(items, ({ matchSize }) => eq(matchSize, maxMatch))));
+            return undefined;
+          })
+          .filter((item) => !!item),
+        ...props,
+      }))
+      .filter(
+        ({ items }) =>
+          !!items.filter(({ matchSize }) => matchSize === maxMatch).length
+      );
 
-    if (isEmpty(matchedGroups)) {
-      this.setState({ display: 'none' });
+    if (!matchedGroups.length) {
+      this.setState({ display: "none" });
       this.setState({ highlight: [0, 0] });
     } else {
-      this.setState({ display: 'suggest' });
+      this.setState({ display: "suggest" });
     }
 
     this.setState({ results: matchedGroups });
-  }
+  };
 
-  onChange = (event) => {
-    const { onChange } = this.props;
-    const {
-      target: { value },
-    } = event;
-    this.generateSuggestions(event);
+  onChange = ({ target: { value = "" } = {} }) => {
+    const { onChange, suggestions } = this.props;
+
+    if (window.Worker) {
+      const suggestionWorkerString = suggestionWorker.toString();
+      const startIndex = suggestionWorkerString.indexOf("{") + 1;
+      const endIndex = suggestionWorkerString.lastIndexOf("}");
+      const suggestionWorkerContent = suggestionWorkerString.substring(
+        startIndex,
+        endIndex
+      );
+      const blob = new Blob([suggestionWorkerContent], {
+        type: "application/javascript",
+      });
+      const worker = new Worker(URL.createObjectURL(blob));
+
+      worker.postMessage({ value, suggestions });
+      worker.onmessage = ({
+        data: { matchedGroups = [], result = {} } = {},
+      }) => {
+        if (!matchedGroups.length) {
+          this.setState({ highlight: [0, 0] });
+
+          if (Object.keys(result).length) {
+            this.setState({ display: "doc" });
+            this.setState({ currentDoc: result });
+          } else {
+            this.setState({ display: "none" });
+          }
+        } else {
+          this.setState({ display: "suggest" });
+        }
+
+        this.setState({ results: matchedGroups });
+        worker.terminate();
+      };
+    } else {
+      this.generateSuggestions({ value, suggestions });
+    }
+
     this.setState({ value }, () => onChange(value));
-  }
+  };
 
   onKeyDown = (event) => {
     const { key } = event;
@@ -253,11 +369,13 @@ export default class FormulaBar extends Component {
     let newItemIndex = currentItemIndex;
 
     switch (key) {
-      case 'ArrowDown':
-        if (eq(display, 'suggest') && !isEmpty(results)) {
+      case "ArrowDown":
+        if (display === "suggest" && !isEmpty(results)) {
           event.preventDefault();
 
-          if (has(results, [currentGroupIndex, 'items', currentItemIndex + 1])) {
+          if (
+            has(results, [currentGroupIndex, "items", currentItemIndex + 1])
+          ) {
             newItemIndex = currentItemIndex + 1;
           } else if (has(results, [currentGroupIndex + 1])) {
             newGroupIndex = currentGroupIndex + 1;
@@ -267,101 +385,126 @@ export default class FormulaBar extends Component {
           this.setState({ highlight: [newGroupIndex, newItemIndex] });
 
           const { type } = get(results, newGroupIndex);
-          const { title } = get(results, [newGroupIndex, 'items', newItemIndex]);
-          const highlightedItem = document.querySelector(`[data-id="${join([type, title], '-')}"]`)
-          if (!isElementVisible(highlightedItem, this.dropdownContainerRef.current)) {
+          const { title } = get(results, [
+            newGroupIndex,
+            "items",
+            newItemIndex,
+          ]);
+          const highlightedItem = document.querySelector(
+            `[data-id="${[type, title].join("-")}"]`
+          );
+          if (
+            !isElementVisible(
+              highlightedItem,
+              this.dropdownContainerRef.current
+            )
+          ) {
             highlightedItem.scrollIntoView(false);
           }
         }
         break;
-      case 'ArrowUp':
-        if (eq(display, 'suggest') && !isEmpty(results)) {
+      case "ArrowUp":
+        if (display === "suggest" && !isEmpty(results)) {
           event.preventDefault();
 
-          if (gt(currentItemIndex, 0)) {
+          if (currentItemIndex > 0) {
             newItemIndex = currentItemIndex - 1;
-          } else if (gt(currentGroupIndex, 0)) {
+          } else if (currentGroupIndex > 0) {
             newGroupIndex = currentGroupIndex - 1;
-            newItemIndex = size(get(results, [newGroupIndex, 'items'])) - 1;
+            newItemIndex = get(results, [newGroupIndex, "items"]).length - 1;
           }
 
           this.setState({ highlight: [newGroupIndex, newItemIndex] });
           const { type } = get(results, newGroupIndex);
-          const { title } = get(results, [newGroupIndex, 'items', newItemIndex]);
-          const highlightedItem = document.querySelector(`[data-id="${join([type, title], '-')}"]`)
+          const { title } = get(results, [
+            newGroupIndex,
+            "items",
+            newItemIndex,
+          ]);
+          const highlightedItem = document.querySelector(
+            `[data-id="${[type, title].join("-")}"]`
+          );
 
-          if (!isElementVisible(highlightedItem, this.dropdownContainerRef.current)) {
+          if (
+            !isElementVisible(
+              highlightedItem,
+              this.dropdownContainerRef.current
+            )
+          ) {
             highlightedItem.scrollIntoView();
           }
         }
         break;
-      case 'Enter':
+      case "Enter":
         event.preventDefault();
-        if (eq(display, 'suggest')) {
+        if (display === "suggest") {
           this.onAutocomplete(currentGroupIndex, currentItemIndex);
         } else {
           this.setState({ value });
-          this.setState({ display: 'none' });
+          this.setState({ display: "none" });
         }
 
         break;
-      case 'Tab':
-        if (eq(display, 'suggest')) {
+      case "Tab":
+        if (display === "suggest") {
           event.preventDefault();
           this.onAutocomplete(currentGroupIndex, currentItemIndex);
         } else {
           this.setState({ value });
-          this.setState({ display: 'none' });
+          this.setState({ display: "none" });
         }
 
         break;
-      case 'Backspace':
-        this.setState({ display: 'none' });
+      case "Backspace":
+        this.setState({ display: "none" });
         break;
-      case 'Escape':
-        this.setState({ display: 'none' });
+      case "Escape":
+        this.setState({ display: "none" });
         break;
       default:
         break;
     }
-  }
+  };
 
   onAutocomplete = (groupIndex, itemIndex) => {
-    const {
-      results,
-      value,
-    } = this.state;
-    const valueTail = first(value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g));
+    const { results, value } = this.state;
+    const [valueTail] = value.match(/([^A-Za-z\d]*[A-Za-z\d]*)$/g);
     const valueLast = last(valueTail);
     // use autocomplete value or default to title
-    const currentTitle = get(results, [groupIndex, 'items', itemIndex, 'autocomplete']) ||
-      get(results, [groupIndex, 'items', itemIndex, 'title']);
-    const indexEnd = indexOf(split(toLower(currentTitle), ''), toLower(valueLast));
+    const currentTitle =
+      get(results, [groupIndex, "items", itemIndex, "autocomplete"]) ||
+      get(results, [groupIndex, "items", itemIndex, "title"]);
+    const indexEnd = currentTitle
+      .toLowerCase()
+      .split("")
+      .indexOf(valueLast.toLowerCase());
     const matchValue = currentTitle.substring(0, indexEnd + 1);
-    const matchSize = size(matchValue);
-    const valueSize = size(value);
+    const matchSize = matchValue.length;
+    const valueSize = value.length;
     const startIndex = valueSize - matchSize;
-    this.setState({ value: `${value.substring(0, startIndex)}${currentTitle}` });
+    this.setState({
+      value: `${value.substring(0, startIndex)}${currentTitle}`,
+    });
 
     // show docs if available
-    const currentDoc = get(results, [groupIndex, 'items', itemIndex, 'docs']);
+    const currentDoc = get(results, [groupIndex, "items", itemIndex, "docs"]);
 
     if (!isEmpty(currentDoc)) {
-      this.setState({ display: 'doc' });
-      this.setState({ currentDoc })
+      this.setState({ display: "doc" });
+      this.setState({ currentDoc });
     } else {
-      this.setState({ display: 'none' });
+      this.setState({ display: "none" });
     }
-  }
+  };
 
   onClickSuggestion = (groupIndex, itemIndex, event) => {
     event.preventDefault();
     this.onAutocomplete(groupIndex, itemIndex);
-  }
+  };
 
   onMouseOver = (groupIndex, itemIndex) => {
     this.setState({ highlight: [groupIndex, itemIndex] });
-  }
+  };
 
   render() {
     const {
@@ -378,44 +521,38 @@ export default class FormulaBar extends Component {
     } = this.props;
 
     const {
-      container: containerStyle = styles => styles,
-      value: valueStyle = styles => styles,
-      input: inputStyle = styles => styles,
-      dropdownContainer: dropdownContainerStyle = styles => styles,
-      suggestContent: suggestContentStyle = styles => styles,
-      listItem: listItemStyle = styles => styles,
-      listItemLabel: listItemLabelStyle = styles => styles,
-      listItemDescription: listItemDescriptionStyle = styles => styles,
-      listGroup: listGroupStyle = styles => styles,
-      docContent: docContentStyle = styles => styles,
-      docSignature: docSignatureStyle = styles => styles,
-      docExample: docExampleStyle = styles => styles,
-      docDescription: docDescriptionStyle = styles => styles,
-      docArg: docArgStyle = styles => styles,
-      docArgName: docArgNameStyle = styles => styles,
-      docArgDescription: docArgDescriptionStyle = styles => styles,
+      container: containerStyle = (styles) => styles,
+      value: valueStyle = (styles) => styles,
+      input: inputStyle = (styles) => styles,
+      dropdownContainer: dropdownContainerStyle = (styles) => styles,
+      suggestContent: suggestContentStyle = (styles) => styles,
+      listItem: listItemStyle = (styles) => styles,
+      listItemLabel: listItemLabelStyle = (styles) => styles,
+      listItemDescription: listItemDescriptionStyle = (styles) => styles,
+      listGroup: listGroupStyle = (styles) => styles,
+      docContent: docContentStyle = (styles) => styles,
+      docSignature: docSignatureStyle = (styles) => styles,
+      docExample: docExampleStyle = (styles) => styles,
+      docDescription: docDescriptionStyle = (styles) => styles,
+      docArg: docArgStyle = (styles) => styles,
+      docArgName: docArgNameStyle = (styles) => styles,
+      docArgDescription: docArgDescriptionStyle = (styles) => styles,
     } = styles;
-    const {
-      value,
-      highlight,
-      results,
-      display,
-      currentDoc,
-    } = this.state;
+    const { value, highlight, results, display, currentDoc } = this.state;
 
     return (
       <div
         ref={this.containerRef}
         className={classes.container}
         style={containerStyle({
-          width: '100%',
-          height: '34px',
-          border: 'solid 1px gray',
-          position: 'relative',
-          fontSize: '14px',
+          width: "100%",
+          height: "34px",
+          border: "solid 1px gray",
+          position: "relative",
+          fontSize: "14px",
           fontFamily: 'Monaco, Courier, "Ubuntu Mono", monospace',
-          borderRadius: '5px',
-          backgroundColor: 'white',
+          borderRadius: "5px",
+          backgroundColor: "white",
         })}
       >
         {/* <section
@@ -434,7 +571,7 @@ export default class FormulaBar extends Component {
                 items,
               }) => {
                 each(items, ({ title }) => {
-                  formula = replace(replace(formula, new RegExp(`\\b(${replace(title, /[|\\{}()[\]^$+*?.-]/g, '\\$&')})\\b`, 'g'), `<span style="color:${color}">$1</span>`), '  ', ' &nbsp;');
+                  formula = replace(replace(formula, new RegExp(`\b(${replace(title, /[|\{}()[\]^$+*?.-]/g, '\$&')})\b`, 'g'), `<span style="color:${color}">$1</span>`), '  ', ' &nbsp;');
                 });
               });
 
@@ -448,20 +585,20 @@ export default class FormulaBar extends Component {
           value={value}
           onKeyDown={this.onKeyDown}
           style={inputStyle({
-            borderStyle: 'none',
-            outline: 'none',
-            width: '100%',
+            borderStyle: "none",
+            outline: "none",
+            width: "100%",
             // padding: '0 6px',
-            lineHeight: '34px',
-            height: '34px',
-            fontSize: '14px',
-            fontFamily: 'Monaco, Courier',
-            position: 'absolute',
+            lineHeight: "34px",
+            height: "34px",
+            fontSize: "14px",
+            fontFamily: "Monaco, Courier",
+            position: "absolute",
             top: 0,
             // color: 'transparent',
-            caretColor: 'black',
-            backgroundColor: 'transparent',
-            overflow: 'hidden'
+            caretColor: "black",
+            backgroundColor: "transparent",
+            overflow: "hidden",
           })}
           readOnly={readonly}
           disabled={disabled}
@@ -469,7 +606,7 @@ export default class FormulaBar extends Component {
           type={type}
           onFocus={onFocus}
           onBlur={() => {
-            this.setState({ display: 'none' });
+            this.setState({ display: "none" });
             onBlur(value);
           }}
         />
@@ -479,24 +616,24 @@ export default class FormulaBar extends Component {
           inputContainer={this.containerRef.current}
           className={classes.dropdownContainer}
           styles={dropdownContainerStyle}
-          isOpen={display !== 'none'}
+          isOpen={display !== "none"}
         >
           {(() => {
             switch (display) {
-              case 'doc':
+              case "doc":
                 return (
                   <div
                     className={classes.docContent}
                     style={docContentStyle({
-                      padding: '6px'
+                      padding: "6px",
                     })}
                   >
                     <div
                       className={classes.docSignature}
                       style={docSignatureStyle({
-                        fontWeight: 'bold',
-                        lineHeight: '20px',
-                        color: 'gray',
+                        fontWeight: "bold",
+                        lineHeight: "20px",
+                        color: "gray",
                       })}
                     >
                       {currentDoc?.signature}
@@ -504,8 +641,8 @@ export default class FormulaBar extends Component {
                     <div
                       className={classes.docDescription}
                       style={docDescriptionStyle({
-                        lineHeight: '15px',
-                        color: 'gray',
+                        lineHeight: "15px",
+                        color: "gray",
                       })}
                     >
                       {currentDoc?.description}
@@ -513,25 +650,27 @@ export default class FormulaBar extends Component {
                     <div
                       className={classes.docExample}
                       style={docExampleStyle({
-                        color: 'gray',
-                        lineHeight: '20px',
+                        color: "gray",
+                        lineHeight: "20px",
                       })}
                     >
-                      {currentDoc?.example ? `Example: ${currentDoc?.example}` : ''}
+                      {currentDoc?.example
+                        ? `Example: ${currentDoc?.example}`
+                        : ""}
                     </div>
                     <>
                       {map(currentDoc?.args, (argDesc, argName) => (
                         <div
-                          key={join(['doc', 'arg', argName], '-')}
+                          key={["doc", "arg", argName].join("-")}
                           className={classes.docArg}
                           style={docArgStyle({
-                            color: 'gray',
+                            color: "gray",
                           })}
                         >
                           <span
                             className={classes.docArgName}
                             style={docArgNameStyle({
-                              fontWeight: 'bold',
+                              fontWeight: "bold",
                             })}
                           >
                             {`${argName}:`}
@@ -539,7 +678,7 @@ export default class FormulaBar extends Component {
                           <span
                             className={classes.docDescription}
                             style={docArgDescriptionStyle({
-                              paddingLeft: '5px',
+                              paddingLeft: "5px",
                             })}
                           >
                             {argDesc}
@@ -548,8 +687,8 @@ export default class FormulaBar extends Component {
                       ))}
                     </>
                   </div>
-                )
-              case 'suggest':
+                );
+              case "suggest":
                 return (
                   <dl
                     className={classes.suggestContent}
@@ -557,73 +696,102 @@ export default class FormulaBar extends Component {
                       margin: 0,
                     })}
                   >
-                    {map(results, ({
-                      type,
-                      items,
-                    }, groupIndex) => (
-                        <Fragment key={join(['suggestion', 'group', type], '-')}>
-                          <dt
-                            className={classes.listGroup}
-                            style={listGroupStyle({
-                              fontWeight: eq(groupIndex, first(highlight)) ? 'bold' : undefined,
-                              padding: '0 6px',
-                              color: 'gray',
-                            })}
+                    {results.map(({ type, items }, groupIndex) => (
+                      <Fragment key={["suggestion", "group", type].join("-")}>
+                        <dt
+                          className={classes.listGroup}
+                          style={listGroupStyle({
+                            fontWeight:
+                              groupIndex === highlight[0] ? "bold" : undefined,
+                            padding: "0 6px",
+                            color: "gray",
+                          })}
+                        >
+                          {type}
+                        </dt>
+                        {items.map(({ title, description }, itemIndex) => (
+                          <dd
+                            data-id={[type, title].join("-")}
+                            className={classes.listItem}
+                            key={[
+                              "suggestion",
+                              "group",
+                              type,
+                              "item",
+                              title,
+                            ].join("-")}
+                            style={listItemStyle(
+                              {
+                                marginLeft: 0,
+                                padding: "5px 6px",
+                                backgroundColor:
+                                  groupIndex === highlight[0] &&
+                                  itemIndex === last(highlight)
+                                    ? "gainsboro"
+                                    : "white",
+                                cursor: "pointer",
+                              },
+                              {
+                                groupIndex,
+                                itemIndex,
+                                highlight,
+                                suggestions,
+                              }
+                            )}
+                            onMouseDown={partial(
+                              this.onClickSuggestion,
+                              groupIndex,
+                              itemIndex
+                            )}
+                            onMouseOver={partial(
+                              this.onMouseOver,
+                              groupIndex,
+                              itemIndex
+                            )}
+                            onFocus={partial(
+                              this.onMouseOver,
+                              groupIndex,
+                              itemIndex
+                            )}
                           >
-                            {type}
-                          </dt>
-                          {map(items, ({
-                            title,
-                            description,
-                          }, itemIndex) => (
-                              <dd
-                                data-id={join([type, title], '-')}
-                                className={classes.listItem}
-                                key={join(['suggestion', 'group', type, 'item', title], '-')}
-                                style={listItemStyle({
-                                  marginLeft: 0,
-                                  padding: '5px 6px',
-                                  backgroundColor: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'gainsboro' : 'white',
-                                  cursor: 'pointer',
-                                }, {
+                            <label
+                              className={classes.listItemLabel}
+                              style={listItemLabelStyle(
+                                {
+                                  fontWeight:
+                                    groupIndex === highlight[0] &&
+                                    itemIndex === last(highlight)
+                                      ? "bold"
+                                      : undefined,
+                                },
+                                {
                                   groupIndex,
                                   itemIndex,
                                   highlight,
                                   suggestions,
-                                })}
-                                onMouseDown={partial(this.onClickSuggestion, groupIndex, itemIndex)}
-                                onMouseOver={partial(this.onMouseOver, groupIndex, itemIndex)}
-                                onFocus={partial(this.onMouseOver, groupIndex, itemIndex)}
-                              >
-                                <label
-                                  className={classes.listItemLabel}
-                                  style={listItemLabelStyle({ fontWeight: (eq(groupIndex, first(highlight)) && eq(itemIndex, last(highlight))) ? 'bold' : undefined }, {
-                                    groupIndex,
-                                    itemIndex,
-                                    highlight,
-                                    suggestions,
-                                  })}
-                                >
-                                  {title}
-                                </label>
-                                <i
-                                  className={classes.listItemDescription}
-                                  style={listItemDescriptionStyle({
-                                    paddingLeft: '14px',
-                                    margin: 0,
-                                    color: 'gray',
-                                  })}
-                                >
-                                  {description}
-                                </i>
-                              </dd>
-                            ))}
-                        </Fragment>
-                      ))}
+                                }
+                              )}
+                            >
+                              {title}
+                            </label>
+                            <i
+                              className={classes.listItemDescription}
+                              style={listItemDescriptionStyle({
+                                paddingLeft: "14px",
+                                margin: 0,
+                                color: "gray",
+                              })}
+                            >
+                              {description}
+                            </i>
+                          </dd>
+                        ))}
+                      </Fragment>
+                    ))}
                   </dl>
                 );
               default:
-                return '';
+                return "";
             }
           })()}
         </Dropdown>
