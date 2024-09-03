@@ -30,86 +30,92 @@ const suggestionWorker = () => {
     const valueTail = value.match(
       /[^A-Za-z\d]*(?:[A-Za-z]+\d*\(?[A-Za-z\d,'"]*)*$/g
     )[0];
-    let valueLast;
-    let insideFunc = false;
-    const valueLastMatch1 = valueTail.match(/[A-Za-z\d]+$/g);
-    const valueLastMatch2 = valueTail.match(/[A-Za-z]+\d*\(/g);
 
-    if (valueTail.match(/[A-Za-z]+\d*$/g) && valueLastMatch1) {
-      valueLast = valueLastMatch1.reverse()[0];
-    } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g) && valueLastMatch2) {
-      // in the context of a function
-      valueLast = valueLastMatch2.reverse()[0].replace("(", "");
-      insideFunc = true;
-    } else {
-      valueLast = valueTail.reverse()[0];
-    }
+    if (valueTail) {
+      let valueLast;
+      let insideFunc = false;
+      const valueLastMatch1 = valueTail.match(/[A-Za-z\d]+$/g);
+      const valueLastMatch2 = valueTail.match(/[A-Za-z]+\d*\(/g);
 
-    if (insideFunc) {
-      suggestions.forEach(({ items }) => {
-        const foundItem = items.find(
-          ({ title }) => title.toLowerCase() === valueLast.toLowerCase()
-        );
+      if (valueTail.match(/[A-Za-z]+\d*$/g) && valueLastMatch1) {
+        valueLast = valueLastMatch1.reverse()[0];
+      } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g) && valueLastMatch2) {
+        // in the context of a function
+        valueLast = valueLastMatch2.reverse()[0].replace("(", "");
+        insideFunc = true;
+      } else {
+        valueLast = valueTail.reverse()[0];
+      }
 
-        if (foundItem) {
-          const { description: itemDescription, docs: itemDocs } = foundItem;
-          const result = Object.assign(
-            { description: itemDescription },
-            itemDocs
+      if (insideFunc) {
+        suggestions.forEach(({ items }) => {
+          const foundItem = items.find(
+            ({ title }) => title.toLowerCase() === valueLast.toLowerCase()
           );
 
-          self.postMessage({ result });
+          if (foundItem) {
+            const { description: itemDescription, docs: itemDocs } = foundItem;
+            const result = Object.assign(
+              { description: itemDescription },
+              itemDocs
+            );
 
-          return false;
-        }
-      });
+            self.postMessage({ result });
 
-      return false;
-    }
+            return false;
+          }
+        });
 
-    let maxMatch = 0;
-    const matchedGroups = suggestions
-      .map(({ items, type, color }) => ({
-        items: items
-          .map(({ title, description, autocomplete, docs }) => {
-            const indexEnd = title
-              .toLowerCase()
-              .indexOf(valueLast.toLowerCase());
-            const matchValue = title.substring(0, indexEnd + valueLast.length);
-            const matchSize = matchValue.length;
+        return false;
+      }
 
-            if (
-              matchSize > 0 &&
-              valueTail.toLowerCase().endsWith(matchValue.toLowerCase()) &&
-              matchSize < title.length
-            ) {
-              maxMatch = matchSize > maxMatch ? matchSize : maxMatch;
+      let maxMatch = 0;
+      const matchedGroups = suggestions
+        .map(({ items, type, color }) => ({
+          items: items
+            .map(({ title, description, autocomplete, docs }) => {
+              const indexEnd = title
+                .toLowerCase()
+                .indexOf(valueLast.toLowerCase());
+              const matchValue = title.substring(
+                0,
+                indexEnd + valueLast.length
+              );
+              const matchSize = matchValue.length;
 
-              if (matchSize >= maxMatch) {
-                return {
-                  title,
-                  matchSize,
-                  description,
-                  autocomplete,
-                  docs: Object.assign({ description }, docs),
-                };
+              if (
+                matchSize > 0 &&
+                valueTail.toLowerCase().endsWith(matchValue.toLowerCase()) &&
+                matchSize < title.length
+              ) {
+                maxMatch = matchSize > maxMatch ? matchSize : maxMatch;
+
+                if (matchSize >= maxMatch) {
+                  return {
+                    title,
+                    matchSize,
+                    description,
+                    autocomplete,
+                    docs: Object.assign({ description }, docs),
+                  };
+                }
+
+                return undefined;
               }
 
               return undefined;
-            }
+            })
+            .filter((item) => !!item),
+          type,
+          color,
+        }))
+        .filter(
+          ({ items }) =>
+            !!items.filter(({ matchSize }) => matchSize === maxMatch).length
+        );
 
-            return undefined;
-          })
-          .filter((item) => !!item),
-        type,
-        color,
-      }))
-      .filter(
-        ({ items }) =>
-          !!items.filter(({ matchSize }) => matchSize === maxMatch).length
-      );
-
-    self.postMessage({ matchedGroups });
+      self.postMessage({ matchedGroups });
+    }
   };
 };
 
