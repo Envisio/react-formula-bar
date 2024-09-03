@@ -32,15 +32,14 @@ const suggestionWorker = () => {
     )[0];
     let valueLast;
     let insideFunc = false;
+    const valueLastMatch1 = valueTail.match(/[A-Za-z\d]+$/g);
+    const valueLastMatch2 = valueTail.match(/[A-Za-z]+\d*\(/g);
 
-    if (valueTail.match(/[A-Za-z]+\d*$/g)) {
-      valueLast = valueTail.match(/[A-Za-z\d]+$/g).reverse()[0];
-    } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g)) {
+    if (valueTail.match(/[A-Za-z]+\d*$/g) && valueLastMatch1) {
+      valueLast = valueLastMatch1.reverse()[0];
+    } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g) && valueLastMatch2) {
       // in the context of a function
-      valueLast = valueTail
-        .match(/[A-Za-z]+\d*\(/g)
-        .reverse()[0]
-        .replace("(", "");
+      valueLast = valueLastMatch2.reverse()[0].replace("(", "");
       insideFunc = true;
     } else {
       valueLast = valueTail.reverse()[0];
@@ -243,10 +242,15 @@ export default class FormulaBar extends Component {
     );
     let valueLast;
     let insideFunc = false;
+    const valueLastMatch1 = valueTail.match(/[A-Za-z\d]+$/g);
+    const valueLastMatch2 = valueTail.match(/[A-Za-z]+\d*\(/g);
 
-    if (valueTail.match(/[A-Za-z]+\d*$/g)) {
-      [valueLast] = valueTail.match(/[A-Za-z\d]+$/g).reverse();
-    } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g)) {
+    if (valueTail.match(/[A-Za-z]+\d*$/g) && valueLastMatch1) {
+      [valueLast] = valueLastMatch1.reverse();
+    } else if (
+      valueTail.match(/[A-Za-z]+\d*\([^\)]*/g) &&
+      valueTail.match(/[A-Za-z]+\d*\(/g)
+    ) {
       // in the context of a function
       valueLast = valueTail
         .match(/[A-Za-z]+\d*\(/g)
