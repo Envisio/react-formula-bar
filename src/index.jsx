@@ -37,14 +37,14 @@ const suggestionWorker = () => {
       const valueLastMatch1 = valueTail.match(/[A-Za-z\d]+$/g);
       const valueLastMatch2 = valueTail.match(/[A-Za-z]+\d*\(/g);
 
-      if (valueTail.match(/[A-Za-z]+\d*$/g) && valueLastMatch1) {
-        valueLast = valueLastMatch1.reverse()[0];
-      } else if (valueTail.match(/[A-Za-z]+\d*\([^\)]*/g) && valueLastMatch2) {
+      if (valueLastMatch1) {
+        [valueLast] = valueLastMatch1.reverse();
+      } else if (valueLastMatch2) {
         // in the context of a function
         valueLast = valueLastMatch2.reverse()[0].replace("(", "");
         insideFunc = true;
       } else {
-        valueLast = valueTail.reverse()[0];
+        [valueLast] = Array.from(valueTail).reverse();
       }
 
       if (insideFunc) {
@@ -264,7 +264,7 @@ export default class FormulaBar extends Component {
         .replace("(", "");
       insideFunc = true;
     } else {
-      [valueLast] = valueTail.reverse();
+      [valueLast] = Array.from(valueTail).reverse();
     }
 
     if (insideFunc) {
