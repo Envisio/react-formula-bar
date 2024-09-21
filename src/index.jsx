@@ -38,13 +38,13 @@ const suggestionWorker = () => {
       const valueLastMatch2 = valueTail.match(/[A-Za-z]+\d*\(/g);
 
       if (valueLastMatch1) {
-        [valueLast] = valueLastMatch1.reverse();
+        valueLast = valueLastMatch1.reverse()[0];
       } else if (valueLastMatch2) {
         // in the context of a function
         valueLast = valueLastMatch2.reverse()[0].replace("(", "");
         insideFunc = true;
       } else {
-        [valueLast] = Array.from(valueTail).reverse();
+        valueLast = Array.from(valueTail).reverse()[0];
       }
 
       if (insideFunc) {
