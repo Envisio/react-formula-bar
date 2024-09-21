@@ -2,3 +2,4 @@
 .DS_Store
 npm-debug.log*
 *storybook.log
+yarn-error.log
